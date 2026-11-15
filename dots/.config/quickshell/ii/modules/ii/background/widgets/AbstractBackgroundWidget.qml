@@ -198,7 +198,13 @@ AbstractWidget {
     }
 
     property bool needsColText: false
-    property color dominantColor: Appearance.colors.colPrimary
+    // The wallpaper's dominant colour arrives asynchronously from the python probe below.
+    // A culled widget is destroyed and rebuilt, so without a cache it repainted from the
+    // colPrimary default first — the clock flashed the wrong tint before the probe returned.
+    // Keyed by wallpaper + screen so a different wallpaper never inherits the old tint.
+    readonly property string dominantColorKey: root.wallpaperPath + "@"
+        + Math.round(root.scaledScreenWidth) + "x" + Math.round(root.scaledScreenHeight)
+    property color dominantColor: GlobalStates.bgDominantColors[root.dominantColorKey] ?? Appearance.colors.colPrimary
     property bool dominantColorIsDark: dominantColor.hslLightness < 0.5
     property color colText: {
         const onLockScrim = (GlobalStates.screenLocked && Config.options.lock.blur.enable)
@@ -252,6 +258,7 @@ AbstractWidget {
                 if (output.length === 0) return;
                 const parsedContent = JSON.parse(output);
                 root.dominantColor = parsedContent.dominant_color || Appearance.colors.colPrimary;
+                GlobalStates.bgDominantColors[root.dominantColorKey] = root.dominantColor;
                 if (root.placementStrategy === "free") return;
                 root.targetX = parsedContent.center_x * root.wallpaperScale - root.width / 2;
                 root.targetY  = parsedContent.center_y * root.wallpaperScale - root.height / 2;

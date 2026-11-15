@@ -128,6 +128,10 @@ Singleton {
     function openSettingsPage(pageId, subPage, sectionTitle) {
         openSettingsAt(pageId, "", sectionTitle ?? "", subPage ?? "");
     }
+    // Last wallpaper-derived dominant colour per wallpaperPath@WxH, so a desktop widget
+    // rebuilt after culling paints the right tint on its first frame (see
+    // AbstractBackgroundWidget). Runtime-only: it is a cache, not a setting.
+    property var bgDominantColors: ({})
     property list<real> visualizerPoints: []
     property bool phoneMicRunning: false
     property bool phoneCameraRunning: false
