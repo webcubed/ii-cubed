@@ -51,6 +51,9 @@ Singleton {
 	property string todoPath: FileUtils.trimFileProtocol(`${Directories.state}/user/todo.json`)
 	property string commandsPath: FileUtils.trimFileProtocol(`${Directories.state}/user/commands.json`)
 	property string notesPath: FileUtils.trimFileProtocol(`${Directories.state}/user/notes.json`)
+    // Authenticator service list (hand-editable) and its python backend
+    property string authenticatorsPath: FileUtils.trimFileProtocol(`${Directories.shellConfig}/authenticators.json`)
+    property string authenticatorScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/authenticator/otp.py`)
 	property string conflictCachePath: FileUtils.trimFileProtocol(`${Directories.cache}/conflict-killer`)
     property string notificationsPath: FileUtils.trimFileProtocol(`${Directories.cache}/notifications/notifications.json`)
     property string lyricsPath: FileUtils.trimFileProtocol(`${Directories.cache}/lyrics/lyrics.json`)

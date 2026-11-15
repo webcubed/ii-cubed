@@ -35,6 +35,20 @@ RippleButton {
     property string cliphistRawString: entry?.rawValue ?? ""
     property string filePath: Images.isValidImageByName(entry?.name) ? entry?.name : ""
     property bool blurImage: entry?.blurImage ?? false
+
+    // Authenticator entries show their live code, so the code ticks with the
+    // Authenticator service instead of being baked into the entry name.
+    readonly property string liveAuthenticatorId: entry?.liveAuthenticatorId ?? ""
+    readonly property bool isAuthenticator: root.liveAuthenticatorId !== ""
+    readonly property string authenticatorCode: root.isAuthenticator ? Authenticator.codeFor(root.liveAuthenticatorId) : ""
+    readonly property int authenticatorRemaining: root.isAuthenticator ? Authenticator.remainingFor(root.liveAuthenticatorId) : 0
+    readonly property real authenticatorProgress: {
+        if (!root.isAuthenticator)
+            return 0;
+        const service = Authenticator.serviceById(root.liveAuthenticatorId);
+        const period = service?.period ?? 30;
+        return Math.max(0, Math.min(1, root.authenticatorRemaining / period));
+    }
     
     visible: root.entryShown
     property int horizontalMargin: 10
@@ -249,6 +263,53 @@ RippleButton {
                     maxWidth: contentColumn.width
                     maxHeight: 140
                     blur: Config.options.search.blurFileSearchResultPreviews
+                }
+            }
+        }
+
+        // Authenticator code + countdown
+        ColumnLayout {
+            Layout.alignment: Qt.AlignVCenter
+            Layout.leftMargin: 10
+            spacing: 3
+            visible: root.isAuthenticator
+
+            StyledText {
+                id: authenticatorCodeText
+                Layout.alignment: Qt.AlignRight
+                text: Authenticator.displayCode(root.liveAuthenticatorId)
+                font.family: Appearance.font.family.monospace
+                font.pixelSize: Appearance.font.pixelSize.larger
+                font.letterSpacing: 1.4
+                color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colPrimary
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: 5
+
+                Rectangle {
+                    Layout.preferredWidth: 42
+                    implicitHeight: 3
+                    radius: Appearance.rounding.full
+                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.75)
+
+                    Rectangle {
+                        width: Math.max(parent.height, parent.width * root.authenticatorProgress)
+                        height: parent.height
+                        radius: parent.radius
+                        color: Appearance.colors.colPrimary
+                        Behavior on width {
+                            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                        }
+                    }
+                }
+
+                StyledText {
+                    text: root.authenticatorRemaining + "s"
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    font.family: Appearance.font.family.monospace
+                    color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
                 }
             }
         }

@@ -15,7 +15,7 @@ Singleton {
     property string query: ""
 
     function ensurePrefix(prefix) {
-        if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch].some(i => root.query.startsWith(i))) {
+        if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch, Config.options.search.prefix.authenticator].some(i => root.query.startsWith(i))) {
             root.query = prefix + root.query.slice(1);
         } else {
             root.query = prefix + root.query;
@@ -98,6 +98,12 @@ Singleton {
                 const count = syntaxMatch[1] ? parseInt(syntaxMatch[1]) : 1;
                 const isImage = !!syntaxMatch[2];
                 Cliphist.superpaste(count, isImage);
+            }
+        },
+        {
+            action: "auth",
+            execute: args => {
+                Authenticator.handleCommand(args);
             }
         },
         {
@@ -312,6 +318,25 @@ Singleton {
                             }
                         })],
                     blurImage: shouldBlurImage
+                });
+            }).filter(Boolean);
+        } else if (root.query.startsWith(Config.options.search.prefix.authenticator)) {
+            // Authenticator codes: Enter copies the highlighted code
+            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.authenticator).trim();
+            return Authenticator.search(searchString).map(service => {
+                return resultComp.createObject(null, {
+                    type: service.issuer ? `${Translation.tr("Authenticator")} · ${service.issuer}` : Translation.tr("Authenticator"),
+                    id: service.id,
+                    name: service.name || service.issuer,
+                    iconName: "key",
+                    iconType: LauncherSearchResult.IconType.Material,
+                    verb: Translation.tr("Copy"),
+                    // The delegate renders the code itself so it stays live
+                    // without rebuilding the result list.
+                    liveAuthenticatorId: service.id,
+                    execute: () => {
+                        Authenticator.copyCode(service.id);
+                    }
                 });
             }).filter(Boolean);
         } else if (root.query.startsWith(Config.options.search.prefix.emojis)) {

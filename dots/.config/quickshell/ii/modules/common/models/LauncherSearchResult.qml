@@ -13,6 +13,9 @@ QtObject {
     property string iconName: ""
     property var iconType: LauncherSearchResult.IconType.None
     property string verb: ""
+    // When set, the delegate renders that authenticator's live TOTP code and
+    // countdown next to the entry (see Authenticator.qml).
+    property string liveAuthenticatorId: ""
     property bool blurImage: false
     property var execute: () => {
         print("Not implemented");

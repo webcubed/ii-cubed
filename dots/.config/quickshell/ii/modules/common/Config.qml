@@ -1422,6 +1422,7 @@ Singleton {
                     property string webSearch: "?"
                     property string keybinds: "<"
                     property string symbols: "."
+                    property string authenticator: "!" // TOTP codes
                 }
                 property JsonObject imageSearch: JsonObject {
                     property string imageSearchEngineBaseUrl: "https://lens.google.com/uploadbyurl?url="
@@ -1429,6 +1430,13 @@ Singleton {
                 }
                 property list<var> clipboardPins: []
                 property bool clipboardPreviewPopup: false
+                property JsonObject authenticator: JsonObject {
+                    property bool enable: true
+                    property int digits: 6
+                    property int period: 30
+                    property string algorithm: "SHA1"
+                    property int clearClipboardAfter: 0 // seconds; 0 keeps the code in the clipboard
+                }
             }
 
             property JsonObject sidebar: JsonObject {

@@ -503,6 +503,7 @@ Calendar events sync via **vdirsyncer** → **khal** → **CalendarService**.
 1. `uv tool install vdirsyncer khal` (or `sudo pacman -S vdirsyncer khal`)
 2. Configure `~/.config/vdirsyncer/config` with Google OAuth credentials
 3. Run `vdirsyncer discover` (opens browser for auth)
+| `Authenticator` | TOTP codes in the launcher (`!` prefix by default). Streams codes from `scripts/authenticator/otp.py`; `/auth` commands add/remove/import/export. Store: `~/.config/illogical-impulse/authenticators.json`. See "Authenticator (TOTP Codes)". |
 4. Run `vdirsyncer sync` to pull events
 5. Configure `~/.config/khal/config` with calendar paths
 
@@ -524,6 +525,38 @@ The left sidebar (`SidebarPoliciesContent.qml`) has tabs controlled by config fl
 | AI | `Config.options.policies.ai !== 0` | `neurology` | `AiChat.qml` |
 | Translator | `Config.options.policies.translator !== 0` | `translate` | `Translator.qml` |
 | Media | `Config.options.policies.player !== 0` | `music_note` | `SidebarPlayerControl.qml` |
+## Authenticator (TOTP Codes)
+
+QML has no crypto, so codes come from a Python backend that streams one JSON
+line per second; the shell only formats and copies them.
+
+| What | Where |
+|------|-------|
+| Service | `services/Authenticator.qml` |
+| Backend | `scripts/authenticator/otp.py` (`stream`, `code`, `list`, `add`, `update`, `remove`, `import`, `export`) |
+| Store | `Directories.authenticatorsPath` → `~/.config/illogical-impulse/authenticators.json` (0600, hand-editable, bare JSON array also accepted) |
+| Launcher prefix | `Config.options.search.prefix.authenticator` (default `!`) |
+| Options | `Config.options.search.authenticator.{enable,digits,period,algorithm,clearClipboardAfter}` |
+
+- Launcher results are created in `LauncherSearch.qml`'s authenticator-prefix
+  branch with `liveAuthenticatorId`; `SearchItem.qml` renders the live code chip
+  and countdown itself. Do **not** bake the code into `name` — a result-list
+  rebuild on every tick would reset the selection.
+- The stream only runs while `GlobalStates.overviewOpen || searchOpen` and
+  services exist (`streamWanted`), with a retry timer plus a 10s watchdog.
+- `copyCode()` copies immediately from the stream; if codes are not ready yet it
+  falls back to a one-shot `otp.py code <id>` process.
+- Import accepts own-store JSON, Aegis, andOTP, 2FAS, generic JSON entries with a
+  secret, and `otpauth://` URI lists (file path or clipboard). Google
+  Authenticator `otpauth-migration://` links are rejected with a message.
+- Export writes JSON or `otpauth://` URIs (0600); the path goes to the clipboard.
+- Store writes are atomic (temp file + `os.replace`) so `FileView.watchChanges`
+  never sees a half-written file.
+
+Search-bar commands (`/auth …`, action prefix): `add <Issuer:account> <secret>`,
+`remove`, `rename`, `secret`, `set <label> key=value…`, `import [file]`,
+`export [json|uri] [file]`, `list`, `help`.
+
 | Wallpapers | `Config.options.policies.wallpapers !== 0` | `wallpaper` | `WallpaperBrowserUI.qml` |
 | Anime | `Config.options.policies.weeb !== 0` | `bookmark_heart` | `Anime.qml` |
 | Tailscale | `Config.options.policies.tailscale !== 0` | `hub` | `TailscalePage.qml` |
