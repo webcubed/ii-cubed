@@ -60,8 +60,18 @@ Item {
         return list;
     }
 
-    readonly property var matches: root.query.length === 0 ? [] : root.flatElements.filter(element => root.score(element) > 0)
-    readonly property int matchCount: root.matches.length
+    /// Numbers of the elements the query matches, or null when the query is empty.
+    readonly property var matchingNumbers: {
+        if (root.query.length === 0)
+            return null;
+        const numbers = {};
+        for (const element of root.flatElements) {
+            if (root.score(element) > 0)
+                numbers[element.number] = true;
+        }
+        return numbers;
+    }
+    readonly property int matchCount: root.matchingNumbers === null ? 0 : Object.keys(root.matchingNumbers).length
 
     function score(element) {
         const query = root.query.toLowerCase();
@@ -111,20 +121,16 @@ Item {
         }
     }
 
-    function select(element) {
-        root.selected = element ? element : null;
-    }
-
     function typeCharacter(character) {
         root.query += character;
-        root.select(root.bestMatch());
+        root.selected = root.bestMatch();
     }
 
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Backspace) {
             if (root.query.length > 0) {
                 root.query = root.query.slice(0, -1);
-                root.select(root.bestMatch());
+                root.selected = root.bestMatch();
             }
             event.accepted = true;
             return;
@@ -140,7 +146,7 @@ Item {
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             const match = root.bestMatch();
             if (match) {
-                root.select(match);
+                root.selected = match;
                 event.accepted = true;
             }
             return;
@@ -249,20 +255,16 @@ Item {
                 id: tableRow
                 spacing: root.spacing
                 required property var modelData
-                required property int index
 
                 Repeater {
                     model: tableRow.modelData
 
                     delegate: ElementTile {
                         required property var modelData
-                        required property int index
                         element: modelData
-                        query: root.query
+                        dimmed: root.matchingNumbers !== null && !root.matchingNumbers[modelData.number]
                         isSelected: root.selected !== null && root.selected.number === modelData.number
-                        period: tableRow.index + 1
-                        group: index + 1
-                        onPicked: (element) => root.select(element)
+                        onPicked: (element) => { root.selected = element }
                     }
                 }
             }
@@ -281,20 +283,16 @@ Item {
                 id: seriesTableRow
                 spacing: root.spacing
                 required property var modelData
-                required property int index
 
                 Repeater {
                     model: seriesTableRow.modelData
 
                     delegate: ElementTile {
                         required property var modelData
-                        required property int index
                         element: modelData
-                        query: root.query
+                        dimmed: root.matchingNumbers !== null && !root.matchingNumbers[modelData.number]
                         isSelected: root.selected !== null && root.selected.number === modelData.number
-                        period: seriesTableRow.index === 0 ? 6 : 7
-                        isSeries: true
-                        onPicked: (element) => root.select(element)
+                        onPicked: (element) => { root.selected = element }
                     }
                 }
             }

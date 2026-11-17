@@ -7,26 +7,14 @@ RippleButton {
     id: root
     required property var element
 
-    // Search state shared by every tile; set by CheatsheetPeriodicTable.
-    property string query: ""
+    // Search state pushed down by CheatsheetPeriodicTable; it owns the ranking,
+    // so a tile only needs to know whether it should fade out.
     property bool isSelected: false
-    property int period: 0
-    property int group: 0
-    property bool isSeries: false
+    property bool dimmed: false
 
     signal picked(var element)
 
     readonly property bool empty: element.type === "empty"
-    readonly property bool matched: {
-        if (root.query.length === 0)
-            return true;
-        if (root.empty)
-            return false;
-        const q = root.query.toLowerCase();
-        return String(root.element.number) === q
-            || String(root.element.symbol).toLowerCase().startsWith(q)
-            || String(root.element.name).toLowerCase().includes(q);
-    }
 
     function categoryColor(type) {
         switch (type) {
@@ -42,7 +30,7 @@ RippleButton {
     readonly property color category: root.categoryColor(root.element.type)
     readonly property color tileBackground: ColorUtils.transparentize(root.category, root.isSelected ? 0.72 : 0.86)
 
-    opacity: root.empty ? 0 : (root.query.length > 0 && !root.matched ? 0.25 : 1)
+    opacity: root.empty ? 0 : (root.dimmed ? 0.25 : 1)
     Behavior on opacity {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }
