@@ -33,6 +33,7 @@ Scope { // Scope
         key: "ext:" + p.extensionId + ":" + p.identifier,
         icon: p.icon || "extension",
         name: p.title || p.identifier,
+        identifier: p.identifier,
         component: ExtensionManager.loadExtensionQmlComponent(p.fullPath),
         extensionId: p.extensionId
     }))
@@ -91,9 +92,44 @@ Scope { // Scope
         { key: "periodicTable", icon: "science", name: Translation.tr("Periodic table"), component: cheatsheetPeriodicTableComponent }
     ]
 
-    readonly property var visibleTabs: root.builtInTabs.concat(root.extensionTabs.length > 0
-        ? root.extensionTabs
-        : [{ key: "empty", icon: "extension_off", name: Translation.tr("Cheat sheet"), component: emptyPlaceholderComponent }])
+    // Built-in tabs first, then extension pages. An installed extension can
+    // re-supply a page the shell already builds in (ii-eve-cheatsheet-commands
+    // next to the built-in Commands tab), so only the first copy is kept —
+    // otherwise the tab bar shows that page twice.
+    readonly property var visibleTabs: {
+        const tabs = root.builtInTabs.slice();
+        const keys = tabs.map(tab => root._tabKey(tab.key));
+        const names = tabs.map(tab => root._tabKey(tab.name));
+        for (const page of root.extensionTabs) {
+            const identifier = root._tabKey(page.identifier);
+            const duplicate = keys.some(key => root._sameTab(key, root._tabKey(page.key)) || root._sameTab(key, identifier))
+                || names.some(name => root._sameTab(name, root._tabKey(page.name)) || root._sameTab(name, identifier));
+            if (duplicate)
+                continue;
+            tabs.push(page);
+            keys.push(root._tabKey(page.key));
+            names.push(root._tabKey(page.name));
+        }
+        // Only a tab bar with nothing else in it needs the placeholder.
+        if (tabs.length === 0)
+            tabs.push({ key: "empty", icon: "extension_off", name: Translation.tr("Cheat sheet"), component: emptyPlaceholderComponent });
+        return tabs;
+    }
+
+    function _tabKey(value) {
+        return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+
+    /// Same tab under different spellings: "commands" and "ii-eve-cheatsheet-commands".
+    function _sameTab(a, b) {
+        if (!a || !b)
+            return false;
+        if (a === b)
+            return true;
+        const shorter = a.length <= b.length ? a : b;
+        const longer = a.length <= b.length ? b : a;
+        return shorter.length >= 5 && longer.includes(shorter);
+    }
 
     readonly property var tabButtonList: root.visibleTabs.map(t => ({ icon: t.icon, name: t.name }))
 
