@@ -46,9 +46,8 @@ Singleton {
         if (entries.length === 0)
             return [];
 
-        const totalUp = entries.reduce((sum, entry) => sum + entry.thumbsUp, 0);
         const rows = [{
-            "type": `${Translation.tr("Urban Dictionary")} · ${totalUp} up`,
+            "type": `${Translation.tr("Urban Dictionary")} · ${entries.length} ${Translation.tr("definitions")}`,
             "name": entries[0].word || term,
             "icon": "local_fire_department",
             "verb": Translation.tr("More"),
@@ -99,7 +98,7 @@ Singleton {
         for (let index = 0; index < Math.min(entries.length, root.maxDefinitions); index++) {
             const entry = entries[index];
             rows.push({
-                "type": `${Translation.tr("Urban")} · ${entry.thumbsUp} up · ${entry.thumbsDown} down`,
+                "type": root._scoreLine(entry, index, entries.length),
                 "name": UrbanDictionary.summary(entry.definition),
                 "maxLines": 3,
                 "verb": Translation.tr("More"),
@@ -112,6 +111,21 @@ Singleton {
         return rows;
     }
 
+    /**
+     * Urban Dictionary's public API now answers 0/0 for thumbs on every entry
+     * (the site renders counts client-side), so show where the definition sits
+     * and who wrote it instead of a row of zeroes. Votes are still used if the
+     * endpoint ever provides them again.
+     */
+    function _scoreLine(entry, index, total) {
+        const votes = Number(entry.thumbsUp ?? 0) + Number(entry.thumbsDown ?? 0);
+        if (votes > 0)
+            return `${Translation.tr("Urban")} · ${entry.thumbsUp} ↑ · ${entry.thumbsDown} ↓`;
+        const author = String(entry.author ?? "").trim();
+        const position = `${Translation.tr("Urban")} · ${index + 1}/${total}`;
+        return author.length > 0 ? `${position} · ${author}` : position;
+    }
+
     function _detail(prefix, term, index) {
         const entries = UrbanDictionary.entries;
         if (entries.length === 0) {
@@ -120,7 +134,7 @@ Singleton {
         }
         const entry = entries[index] ?? entries[0];
         const rows = [{
-            "type": `${entry.word || term} · ${entry.thumbsUp} up · ${entry.thumbsDown} down`,
+            "type": root._scoreLine(entry, index, entries.length),
             "name": entry.definition,
             "maxLines": 5,
             "icon": "format_quote",
