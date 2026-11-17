@@ -550,7 +550,9 @@ Singleton {
                 for (let site of Config.options.search.excludedSites) {
                     url += ` -site:${site}`;
                 }
-                Qt.openUrlExternally(url);
+                // Through LauncherMenu: it raises the running browser first, so the tab does
+                // not land behind whatever had focus when the launcher closed.
+                LauncherMenu.openUrl(url);
             }
         });
         const launcherActionObjects = root.allActions.map(action => {

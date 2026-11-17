@@ -2,6 +2,7 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 
 import qs
+import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import QtQuick
@@ -25,9 +26,41 @@ Singleton {
         Quickshell.clipboardText = String(text ?? "");
     }
 
+    // A URL handed to an already-running browser lands as a tab in its window, but the
+    // window never raises itself, so a launcher web search looked like it went nowhere.
+    // Focus the browser first (focuswindow also follows it to its workspace).
+    readonly property var browserClasses: /^(zen|firefox|chromium|google-chrome|google-chrome-stable|brave-browser|microsoft-edge|librewolf|vivaldi|opera)$/i
+    function runningBrowser() {
+        // Tiled windows first: a zen oauth/extension dialog is also class `zen`, and raising
+        // a popup would leave the real window exactly where it was.
+        const browsers = (HyprlandData.windowList ?? []).filter(w => root.browserClasses.test(String(w.class ?? "")));
+        return browsers.find(w => !w.floating) ?? browsers[0];
+    }
+
     function openUrl(url) {
-        if (String(url ?? "").length > 0)
-            Qt.openUrlExternally(url);
+        const target = String(url ?? "");
+        if (target.length === 0) return;
+        if (root.focusBrowser())
+            refocusTimer.restart();
+        // xdg-open rather than Qt.openUrlExternally so the delivery path is the same one
+        // that can be reproduced from a terminal (mimeapps default browser).
+        Quickshell.execDetached(["xdg-open", target]);
+    }
+
+    function focusBrowser() {
+        const browser = root.runningBrowser();
+        if (!browser) return false;
+        Quickshell.execDetached(["hyprctl", "dispatch", `hl.dsp.focus({ window = "address:${browser.address}" })`]);
+        return true;
+    }
+
+    // Closing the launcher hands focus back to whatever was focused before it opened, undoing
+    // the raise above. Re-assert once it is gone, still before the tab finishes loading.
+    Timer {
+        id: refocusTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.focusBrowser()
     }
 
     function backRow(drill, label) {
