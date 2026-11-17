@@ -33,6 +33,12 @@ Singleton {
     property list<var> droppedFiles: []
     property list<var> discoveredDevices: []
     property bool sending: false
+    property string sendError: ""
+    property string sendTarget: ""
+    property string lastSendStderr: ""
+    // Directories.home is a file:// URL; child processes need a plain path.
+    readonly property string homePath: Directories.home.toString().replace(/^file:\/\//, "")
+    readonly property string processPath: homePath + "/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
     signal transferRequested(var transfer)
     signal transferStarted(var transfer)
@@ -74,17 +80,68 @@ Singleton {
         return (bytes / (1024 * 1024)).toFixed(1) + " MB"
     }
 
+    function shellQuote(value): string {
+        return "'" + String(value).replace(/'/g, "'\\''") + "'"
+    }
+
+    // Redirects the send through scripts/localsend-send.py: the plain CLI never
+    // presents the TLS client certificate a LocalSend 2.x receiver demands, so the
+    // handshake is aborted with "tlsv13 alert certificate required".
+    // It runs with the interpreter of this machine's uv-installed localsend-cli.
+    function buildSendCommand(deviceIp, filePaths): string {
+        const wrapper = shellQuote(Directories.scriptPath + "/localsend-send.py")
+        const files = filePaths.map(path => shellQuote(path)).join(" ")
+        const resolveInterpreter = 'py="$(command -v localsend-cli)" && py="$(dirname "$(readlink -f "$py")")/python"'
+        return resolveInterpreter
+            + ' || { echo \'{"event":"error","message":"localsend-cli is not installed"}\'; exit 127; }; '
+            + `exec "$py" ${wrapper} send ${shellQuote(deviceIp)} ${files} --json`
+    }
+
     function sendToDevice(deviceIp: string): void {
-        if (!root.available || root.sending || root.droppedFiles.length === 0) return
+        if (root.sending || root.droppedFiles.length === 0) return
+        if (!root.available) {
+            root.sendError = Translation.tr("localsend-cli is not available")
+            root.sendFailed(root.sendError)
+            return
+        }
+        root.sendError = ""
+        root.lastSendStderr = ""
+        root.sendTarget = deviceIp
         root.sending = true
-        const filePaths = root.droppedFiles.map(f => f.path)
-        sendProc.command = ["bash", "-lc",`localsend-cli send ${deviceIp} ${filePaths.join(" ")} --json`]
+        sendWatchdog.restart()
+        sendProc.command = ["bash", "-lc", root.buildSendCommand(deviceIp, root.droppedFiles.map(f => f.path))]
         sendProc.running = true
     }
 
-    function cancelSend(): void {
-        sendProc.running = false
+    function retrySend(): void {
+        if (root.sendTarget.length === 0) return
+        root.sendToDevice(root.sendTarget)
+    }
+
+    function clearSendError(): void {
+        root.sendError = ""
+    }
+
+    // Single exit point for a send attempt, so the popup can never stay on "Sending...".
+    function finishSend(errorMessage: string): void {
+        sendWatchdog.stop()
         root.sending = false
+        if (sendProc.running) sendProc.running = false
+        if (errorMessage && errorMessage.length > 0) {
+            root.sendError = errorMessage
+            console.warn("[LocalSend] Send failed:", errorMessage)
+            root.sendFailed(errorMessage)
+        }
+    }
+
+    function cancelSend(): void {
+        root.finishSend(Translation.tr("Transfer cancelled"))
+    }
+
+    Timer {
+        id: sendWatchdog
+        interval: 15 * 60 * 1000
+        onTriggered: root.finishSend(Translation.tr("Send timed out"))
     }
 
     // Check if localsend-cli is available
@@ -93,7 +150,7 @@ Singleton {
         running: true
         command: ["bash", "-lc", "which localsend-cli"]
         environment: ({
-            "PATH": Directories.home + "/.local/bin:/usr/local/bin:/usr/bin:/bin"
+            "PATH": root.processPath
         })
         onExited: (exitCode, exitStatus) => {
             root.available = (exitCode === 0)
@@ -150,7 +207,7 @@ Singleton {
         stdinEnabled: true
 
         environment: ({
-            "PATH": Directories.home + "/.local/bin:/usr/local/bin:/usr/bin:/bin"
+            "PATH": root.processPath
         })
 
         stdout: SplitParser {
@@ -183,7 +240,7 @@ Singleton {
         running: false
 
         environment: ({
-            "PATH": Directories.home + "/.local/bin:/usr/local/bin:/usr/bin:/bin"
+            "PATH": root.processPath
         })
 
         stdout: SplitParser {
@@ -192,11 +249,16 @@ Singleton {
                 console.log("[LocalSend] Send progress:", line)
                 try {
                     const event = JSON.parse(line)
-                    if (event.event === "completed" || event.event === "saved" || event.event === "done") {
+                    // The CLI reports failures as {"event":"error","message":...}.
+                    switch (event.event) {
+                    case "error":
+                        root.finishSend(event.message || Translation.tr("Transfer failed"))
+                        break
+                    case "done":
                         root.clearDroppedFiles()
+                        root.finishSend("")
                         root.sendCompleted()
-                    } else if (event.event === "cancelled" || event.error) {
-                        root.sendFailed(event.error || "Transfer cancelled")
+                        break
                     }
                 } catch (e) {
                     console.log("[LocalSend] Failed to parse send line:", line, e)
@@ -206,14 +268,21 @@ Singleton {
 
         stderr: SplitParser {
             onRead: line => {
+                if (!line || line.trim().length === 0) return
                 console.log("[LocalSend] Send stderr:", line)
+                root.lastSendStderr = line
             }
         }
 
         onExited: (exitCode, exitStatus) => {
-            root.sending = false
-            if (exitCode !== 0) {
-                root.sendFailed("Send process exited with code: " + exitCode)
+            // finishSend() stops the process, which also lands here: don't report that
+            // as a second failure on top of the real reason.
+            if (!root.sending) return
+            if (exitCode === 0) {
+                root.finishSend("")
+            } else {
+                const detail = root.lastSendStderr.length > 0 ? ": " + root.lastSendStderr : ""
+                root.finishSend(Translation.tr("Send failed (exit code %1)").arg(exitCode) + detail)
             }
         }
     }

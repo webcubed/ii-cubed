@@ -58,9 +58,18 @@ conflicts=("$_pkgname" "$_pkgname-git")
 
 _pkgsrc="$_pkgname"
 source=("$_pkgsrc::git+$url.git#commit=$_commit"
+  fix-qt612-moc-includes.patch
   quickshell-check.hook)
 sha256sums=('SKIP'
+  'SKIP'
   '8543e21aeaaa5441b73a679160e7601a957f16c433e8d6bd9257e80bd0e94083')
+
+prepare() {
+  cd "$_pkgname"
+  # Qt 6.12 requires MOC to see complete types; the pinned commit still declares
+  # opaque pointers. Upstream fix (commit 5d5d498) backported onto the pin.
+  patch -Np1 -i "$srcdir/fix-qt612-moc-includes.patch"
+}
 
 build() {
   cd "$_pkgname"

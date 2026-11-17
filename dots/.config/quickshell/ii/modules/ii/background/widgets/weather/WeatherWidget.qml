@@ -111,17 +111,14 @@ AbstractBackgroundWidget {
                 }
                 spacing: -4
 
-                MaterialShapeWrappedMaterialSymbol {
+                WeatherIcon {
                     Layout.alignment: Qt.AlignRight
-                    shape: MaterialShape.Shape.Cookie12Sided
-                    color: Appearance.colors.colPrimary
-                    colSymbol: Appearance.colors.colOnPrimary
                     text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
                     iconSize: 18
-                    fill: 1
                     padding: 6
                     implicitWidth: 34
                     implicitHeight: 34
+                    onRefreshRequested: Weather.getData()
                 }
 
                 Item { Layout.fillHeight: true }
@@ -183,17 +180,14 @@ AbstractBackgroundWidget {
 
                     Item { Layout.fillWidth: true }
 
-                    MaterialShapeWrappedMaterialSymbol {
+                    WeatherIcon {
                         Layout.topMargin: 2
-                        shape: MaterialShape.Shape.Cookie12Sided
-                        color: Appearance.colors.colPrimary
-                        colSymbol: Appearance.colors.colOnPrimary
                         text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
                         iconSize: 24
-                        fill: 1
                         padding: 12
                         implicitWidth: 56
                         implicitHeight: 56
+                        onRefreshRequested: Weather.getData()
                     }
                 }
 
@@ -334,17 +328,14 @@ AbstractBackgroundWidget {
 
                     Item { Layout.fillWidth: true }
 
-                    MaterialShapeWrappedMaterialSymbol {
+                    WeatherIcon {
                         Layout.topMargin: -19
-                        shape: MaterialShape.Shape.Cookie12Sided
-                        color: Appearance.colors.colPrimary
-                        colSymbol: Appearance.colors.colOnPrimary
                         text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
                         iconSize: 18
-                        fill: 1
                         padding: 6
                         implicitWidth: 42
                         implicitHeight: 42
+                        onRefreshRequested: Weather.getData()
                     }
                 }
 
@@ -496,18 +487,15 @@ AbstractBackgroundWidget {
 
                     Item { Layout.fillWidth: true }
 
-                    MaterialShapeWrappedMaterialSymbol {
+                    WeatherIcon {
                         Layout.topMargin: -5
                         Layout.alignment: Qt.AlignVCenter
-                        shape: MaterialShape.Shape.Cookie12Sided
-                        color: Appearance.colors.colPrimary
-                        colSymbol: Appearance.colors.colOnPrimary
                         text: Icons.getWeatherIcon(Weather.data.wCode) ?? "cloud"
                         iconSize: 24
-                        fill: 1
                         padding: 10
                         implicitWidth: 50
                         implicitHeight: 50
+                        onRefreshRequested: Weather.getData()
                     }
                 }
 

@@ -144,6 +144,20 @@ AbstractBackgroundWidget {
             z: -2
         }
 
+        // The wheel walks the calendar the way the chevrons do: a month at a time, or a
+        // day at a time while the day sheet has one day open, which is what the sheet's
+        // own arrows do.
+        WheelHandler {
+            onWheel: (event) => {
+                const steps = Math.sign(event.angleDelta.y);
+                if (steps === 0) return;
+                const delta = steps > 0 ? -1 : 1;
+                if (root.detailDate !== "") root.shiftDetail(delta);
+                else root.moveMonth(delta);
+                event.accepted = true;
+            }
+        }
+
         ColumnLayout {
             anchors {
                 fill: parent

@@ -100,6 +100,22 @@ Singleton {
         refreshPomodoro();
     }
 
+    // Scroll-to-set on the desktop tile: a wheel notch moves the current phase (focus,
+    // break or long break) by a minute and saves it, so the next cycle uses it too.
+    // Refused while the timer runs — shortening a phase mid-cycle would jump the
+    // readout and could end the phase outright.
+    function pomodoroAdjustPhaseMinutes(minutes) {
+        const delta = Math.round(minutes * 60);
+        if (root.pomodoroRunning || delta === 0) return;
+        if (root.pomodoroBreak) {
+            if (root.pomodoroLongBreak) Config.options.time.pomodoro.longBreak = Math.max(60, longBreakTime + delta);
+            else Config.options.time.pomodoro.breakTime = Math.max(60, breakTime + delta);
+        } else {
+            Config.options.time.pomodoro.focus = Math.max(60, focusTime + delta);
+        }
+        root.pomodoroSecondsLeft = root.pomodoroLapDuration;
+    }
+
     // Stopwatch
     function refreshStopwatch() {  // Stopwatch stores time in 10ms
         stopwatchTime = getCurrentTimeIn10ms() - stopwatchStart;
@@ -174,6 +190,35 @@ Singleton {
 
     function countdownSet(minutes) {
         countdownSetSeconds(minutes * 60);
+    }
+
+    // Wheel adjustment for the countdown tile. A running timer moves its remaining time
+    // with the target (the elapsed part stays elapsed) and can't be scrolled down past
+    // the moment it would finish, so a stray scroll never fires the alarm; a paused one
+    // moves its saved remaining time by the same amount instead.
+    function countdownAdjustMinutes(minutes) {
+        const delta = Math.round(minutes * 60);
+        if (delta === 0) return;
+        const st = Persistent.states.timer.countdown;
+        const current = st.duration ?? 0;
+        let duration = current + delta;
+        if (root.countdownRunning) {
+            if (st.start <= 0) return;
+            duration = Math.max(getCurrentTimeInSeconds() - st.start + 1, duration);
+        } else {
+            duration = Math.max(60, duration);
+        }
+        const applied = duration - current;
+        if (applied === 0) return;
+        st.duration = duration;
+        root.countdownDuration = duration;
+        if (root.countdownRunning) {
+            refreshCountdown();
+        } else {
+            const left = Math.max(1, Math.min(duration, (st.left ?? duration) + applied));
+            st.left = left;
+            root.countdownLeft = left;
+        }
     }
 
     // Same as countdownSet but keeps sub-minute precision, for durations typed into the

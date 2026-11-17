@@ -129,23 +129,64 @@ PanelWindow {
 
     // Grabs the whole annotated view, then crops down to the selection.
     // A reused Process (one export at a time — buttons dismiss the editor).
+    // The grab is in device px while `crop` is in image px, so ImageMagick
+    // measures the grab itself (identify) instead of trusting a
+    // device-pixel-ratio / `result.image` assumption: a NaN or out-of-range
+    // `-crop` geometry makes magick exit non-zero, which used to abort the
+    // whole export and copy nothing at all.
+    readonly property string cropScript: [
+        "set -e",
+        "in=$1; out=$2; iw=$3; ih=$4; x=$5; y=$6; w=$7; h=$8",
+        "gw=$(magick identify -format %w \"$in\")",
+        "gh=$(magick identify -format %h \"$in\")",
+        "geom=$(awk -v gw=\"$gw\" -v gh=\"$gh\" -v iw=\"$iw\" -v ih=\"$ih\" -v x=\"$x\" -v y=\"$y\" -v w=\"$w\" -v h=\"$h\" "
+            + "'BEGIN { x1 = x*gw/iw; y1 = y*gh/ih; x2 = (x+w)*gw/iw; y2 = (y+h)*gh/ih; "
+            + "printf \"%dx%d+%d+%d\", x2-x1+0.5, y2-y1+0.5, x1+0.5, y1+0.5 }')",
+        "magick \"$in\" -crop \"$geom\" +repage \"$out\""
+    ].join("\n")
+
+    // Crop rect in image px, clamped to the capture and rounded to whole
+    // pixels. null = no crop needed (whole capture, or a degenerate rect).
+    function exportCrop() {
+        const iw = img.sourceSize.width, ih = img.sourceSize.height;
+        const c = root.crop;
+        if (!c || !(iw > 0) || !(ih > 0)) return null;
+        const x = Math.max(0, Math.min(Number(c.x) || 0, iw));
+        const y = Math.max(0, Math.min(Number(c.y) || 0, ih));
+        const w = Math.max(0, Math.min(Number(c.w) || 0, iw - x));
+        const h = Math.max(0, Math.min(Number(c.h) || 0, ih - y));
+        if (w < 2 || h < 2) return null;
+        if (x <= 1 && y <= 1 && w >= iw - 1 && h >= ih - 1) return null;
+        return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+    }
+
     Process {
         id: exportCropProc
         property string _in: ""
         property string _out: ""
         property var _cb: null
+        property string _err: ""
+        stderr: StdioCollector {
+            id: exportCropErr
+            onStreamFinished: exportCropProc._err = exportCropErr.text
+        }
         onExited: (code, _) => {
             const inF = exportCropProc._in;
             const out = exportCropProc._out;
             const cb = exportCropProc._cb;
-            exportCropProc._in = ""; exportCropProc._out = ""; exportCropProc._cb = null;
-            Quickshell.execDetached(["rm", "-f", inF]);
-            if (code !== 0 || !cb) {
-                console.warn("[Annotation Editor] Export crop failed, code", code);
-                root.dismiss();
+            const err = exportCropProc._err.trim();
+            exportCropProc._in = ""; exportCropProc._out = ""; exportCropProc._cb = null; exportCropProc._err = "";
+            if (code === 0 && cb) {
+                Quickshell.execDetached(["rm", "-f", inF]);
+                cb(out);
                 return;
             }
-            cb(out);
+            // Never lose the snip to a failed crop step: hand over the
+            // uncropped (still annotated) grab instead of dismissing empty.
+            console.warn("[Annotation Editor] Export crop failed, code", code, err);
+            Quickshell.execDetached(["rm", "-f", out]);
+            if (cb) cb(inF);
+            else Quickshell.execDetached(["rm", "-f", inF]);
         }
     }
 
@@ -157,22 +198,18 @@ PanelWindow {
                 root.dismiss();
                 return;
             }
-            const c = root.crop;
-            const iw = img.sourceSize.width, ih = img.sourceSize.height;
-            const isFull = !c || (c.x <= 1 && c.y <= 1 && c.w >= iw - 1 && c.h >= ih - 1);
-            if (isFull) {
+            const c = root.exportCrop();
+            if (c === null) {
                 cb(full);
                 return;
             }
-            const k = result.image.width / iw;
             const out = `${Directories.screenshotTemp}/annotated-crop-${Date.now()}.png`;
             exportCropProc._in = full;
             exportCropProc._out = out;
             exportCropProc._cb = cb;
-            exportCropProc.exec(["magick", full,
-                "-crop", `${Math.round(c.w * k)}x${Math.round(c.h * k)}`
-                    + `+${Math.round(c.x * k)}+${Math.round(c.y * k)}`,
-                "+repage", out]);
+            exportCropProc.exec(["bash", "-c", root.cropScript, "bash", full, out,
+                String(img.sourceSize.width), String(img.sourceSize.height),
+                String(c.x), String(c.y), String(c.w), String(c.h)]);
         });
     }
 

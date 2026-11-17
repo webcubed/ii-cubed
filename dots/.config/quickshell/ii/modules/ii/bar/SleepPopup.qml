@@ -60,6 +60,47 @@ StyledPopup {
             opacity: 0.65
         }
 
+        // The school day the alarm counts to, in the calendar's own block colours: the
+        // hint is decided by that calendar, so the day it decided on belongs here too.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 1
+            visible: SleepSchedule.showWakeDay
+            spacing: 5
+
+            StyledText {
+                text: SleepSchedule.wakeDayWeekday
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                font.weight: Font.DemiBold
+                color: Appearance.colors.colOnSurface
+                opacity: 0.55
+            }
+            StyledText {
+                visible: text !== ""
+                text: SleepSchedule.wakeDayBlock
+                font.family: StuyCalendar.blockFontFamily
+                font.pixelSize: 15
+                font.variableAxes: StuyCalendar.blockFontAxes
+                color: SleepSchedule.wakeDayColor
+            }
+            Rectangle {
+                Layout.alignment: Qt.AlignVCenter
+                visible: SleepSchedule.wakeDayBlock === ""
+                width: 5
+                height: 5
+                radius: 2.5
+                color: SleepSchedule.wakeDayColor
+            }
+            StyledText {
+                Layout.fillWidth: true
+                text: SleepSchedule.wakeDayNote
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colOnSurface
+                opacity: 0.65
+                elide: Text.ElideRight
+            }
+        }
+
         Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 6

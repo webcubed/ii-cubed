@@ -121,13 +121,88 @@ SectionCard {
         }
 
         // Sending indicator
-        StyledText {
+        RowLayout {
             visible: LocalSend.sending
-            text: Translation.tr("Sending... (Check your device for the status)")
-            font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colPrimary
-            horizontalAlignment: Text.AlignHCenter
             Layout.fillWidth: true
+            spacing: 8
+
+            StyledText {
+                Layout.fillWidth: true
+                text: Translation.tr("Sending... (Check your device for the status)")
+                font.pixelSize: Appearance.font.pixelSize.small
+                color: Appearance.colors.colPrimary
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            RippleButton {
+                implicitWidth: 26
+                implicitHeight: 26
+                buttonRadius: Appearance.rounding.full
+                colBackground: "transparent"
+                onClicked: LocalSend.cancelSend()
+                contentItem: MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: "close"
+                    iconSize: 14
+                    color: Appearance.colors.colSubtext
+                    fill: 1
+                }
+            }
+        }
+
+        // Failure state, so a rejected offer is never a silent "Sending..."
+        ColumnLayout {
+            visible: LocalSend.sendError !== ""
+            Layout.fillWidth: true
+            spacing: 6
+
+            StyledText {
+                Layout.fillWidth: true
+                text: LocalSend.sendError
+                font.pixelSize: Appearance.font.pixelSize.small
+                color: Appearance.colors.colError
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 8
+
+                RippleButton {
+                    buttonRadius: Appearance.rounding.normal
+                    colBackground: Appearance.colors.colErrorContainer
+                    colBackgroundHover: Appearance.colors.colErrorContainerHover
+                    onClicked: LocalSend.retrySend()
+                    contentItem: RowLayout {
+                        spacing: 6
+                        anchors.centerIn: parent
+                        MaterialSymbol {
+                            text: "refresh"
+                            iconSize: 16
+                            color: Appearance.colors.colOnErrorContainer
+                        }
+                        StyledText {
+                            text: Translation.tr("Retry")
+                            color: Appearance.colors.colOnErrorContainer
+                            font.pixelSize: Appearance.font.pixelSize.small
+                        }
+                    }
+                }
+
+                RippleButton {
+                    buttonRadius: Appearance.rounding.normal
+                    colBackground: Appearance.colors.colSecondaryContainer
+                    colBackgroundHover: Appearance.colors.colSecondaryContainerHover
+                    onClicked: LocalSend.clearSendError()
+                    contentItem: StyledText {
+                        anchors.centerIn: parent
+                        text: Translation.tr("Dismiss")
+                        color: Appearance.colors.colOnSecondaryContainer
+                        font.pixelSize: Appearance.font.pixelSize.small
+                    }
+                }
+            }
         }
 
         // No devices placeholder

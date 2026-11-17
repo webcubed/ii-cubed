@@ -52,6 +52,20 @@ AbstractBackgroundWidget {
             z: -2
         }
 
+        // Scroll on the card to move the alarm by the same five minutes the stepper
+        // below uses, so the common adjustment does not need the buttons. On a free
+        // night the hint does not count from the alarm at all, so the wheel is left
+        // alone rather than quietly editing a time nothing reads.
+        WheelHandler {
+            onWheel: (event) => {
+                if (SleepSchedule.freeNight) return;
+                const steps = Math.sign(event.angleDelta.y);
+                if (steps === 0) return;
+                root.stepWake(-steps * root.wakeStepMinutes);
+                event.accepted = true;
+            }
+        }
+
         ColumnLayout {
             anchors {
                 fill: parent
@@ -85,6 +99,48 @@ AbstractBackgroundWidget {
                         : SleepSchedule.countdownLabel
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     color: Appearance.colors.colPrimary
+                }
+            }
+
+            // Which school day the alarm is counting to. A bedtime decision usually
+            // turns on it — an A day, a B day, or no school at all — and the card has
+            // no other way to say so without opening the calendar.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 1
+                visible: root.withOptions && SleepSchedule.showWakeDay
+                spacing: 5
+
+                StyledText {
+                    text: SleepSchedule.wakeDayWeekday
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colOnPrimaryContainer
+                    opacity: 0.55
+                }
+                StyledText {
+                    visible: text !== ""
+                    text: SleepSchedule.wakeDayBlock
+                    font.family: StuyCalendar.blockFontFamily
+                    font.pixelSize: 14
+                    font.variableAxes: StuyCalendar.blockFontAxes
+                    color: SleepSchedule.wakeDayColor
+                }
+                Rectangle {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: SleepSchedule.wakeDayBlock === ""
+                    width: 5
+                    height: 5
+                    radius: 2.5
+                    color: SleepSchedule.wakeDayColor
+                }
+                StyledText {
+                    Layout.fillWidth: true
+                    text: SleepSchedule.wakeDayNote
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    color: Appearance.colors.colOnPrimaryContainer
+                    opacity: 0.65
+                    elide: Text.ElideRight
                 }
             }
 

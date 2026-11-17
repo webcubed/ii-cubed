@@ -93,6 +93,31 @@ Singleton {
         : root.mode === "alarm" ? false
         : !root.wakeIsCertain
 
+    // What the morning behind the alarm will be. The hint already asks the school
+    // calendar whether that morning is a school morning, so it may as well say which
+    // one: the block letter (A/A1/A2 in the calendar's red, B/B1/B2 in its blue) and,
+    // when the day is not an ordinary one, the wording that explains why — a holiday, a
+    // special schedule, a remote day. Read from the same entry the `freeNight` decision
+    // uses, so the card and the popup cannot disagree about the day that is coming.
+    readonly property string wakeDayKey: StuyCalendar.dateKey(root.wakeDate)
+    readonly property var wakeDayEntry: StuyCalendar.entryFor(root.wakeDayKey)
+    readonly property string wakeDayBlock: root.wakeDayEntry?.block ?? ""
+    readonly property string wakeDayWeekday: StuyCalendar.shortWeekdayNames[root.wakeDate.getDay()]
+    readonly property string wakeDayNote: {
+        const entry = root.wakeDayEntry;
+        if (!entry || entry.category === "school_day") return "";
+        return StuyCalendar.categoryLabel(entry.category);
+    }
+    // A holiday has no block letter, so the caller draws a dot in the category colour
+    // instead — the same colour the calendar's own cells use.
+    readonly property color wakeDayColor: root.wakeDayBlock !== ""
+        ? StuyCalendar.blockColor(root.wakeDayBlock)
+        : (StuyCalendar.categoryDot(root.wakeDayEntry?.category) || StuyCalendar.palette.subtext)
+    // Only meaningful while the hint counts back from an alarm: a predicted wake has no
+    // school morning behind it, and before the calendar has loaded there is nothing to
+    // report rather than a wrong answer.
+    readonly property bool showWakeDay: !root.freeNight && root.wakeDayEntry != null
+
     function bedtimeMarker(cycles) {
         return root.wakeMarker - (cycles * root.cycleMinutes + root.fallAsleepMinutes);
     }

@@ -101,6 +101,13 @@ AbstractBackgroundWidget {
         root.expandedTimer = id;
         root.configEntry.expandedTimer = id;
     }
+    // One wheel notch moves a tile's duration by a minute, or five with Shift held. The
+    // stopwatch has no target to move, so it ignores the wheel entirely.
+    function stepTimer(id, delta, coarse) {
+        const minutes = delta * (coarse ? 5 : 1);
+        if (id === "countdown") TimerService.countdownAdjustMinutes(minutes);
+        else if (id === "pomodoro") TimerService.pomodoroAdjustPhaseMinutes(minutes);
+    }
 
     component TimerCard: WidgetCard {
         id: timerCard
@@ -117,6 +124,8 @@ AbstractBackgroundWidget {
         property color shapeColor: Appearance.colors.colPrimary
         property var onToggle: () => {}
         property var onReset: () => {}
+        // Set by the tiles whose duration can be changed by scrolling.
+        property var wheelStep: null
         default property alias extraContent: extraSlot.data
 
         implicitWidth: root.cardWidth
@@ -132,6 +141,18 @@ AbstractBackgroundWidget {
             acceptedButtons: Qt.RightButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor
             onClicked: timerCard.onReset()
+        }
+
+        // Scroll on the tile to set its time. WheelHandler sits above the drag area, so
+        // the notch is consumed here instead of moving the desktop or the card.
+        WheelHandler {
+            onWheel: (event) => {
+                if (!timerCard.wheelStep) return;
+                const steps = Math.sign(event.angleDelta.y);
+                if (steps === 0) return;
+                timerCard.wheelStep(steps, (event.modifiers & Qt.ShiftModifier) !== 0);
+                event.accepted = true;
+            }
         }
 
         // The tile is a square, and a countdown tile also carries the +1/+5 pills, so
@@ -232,6 +253,7 @@ AbstractBackgroundWidget {
             shape: MaterialShape.Shape.Flower
             onToggle: () => TimerService.togglePomodoro()
             onReset: () => TimerService.resetPomodoro()
+            wheelStep: (delta, coarse) => root.stepTimer("pomodoro", delta, coarse)
         }
 
         // Stopwatch
@@ -257,6 +279,7 @@ AbstractBackgroundWidget {
             shape: MaterialShape.Shape.Bun
             onToggle: () => TimerService.toggleCountdown()
             onReset: () => TimerService.resetCountdown()
+            wheelStep: (delta, coarse) => root.stepTimer("countdown", delta, coarse)
 
             RowLayout {
                 anchors.fill: parent
@@ -349,6 +372,16 @@ AbstractBackgroundWidget {
         visible: root.expanded
         widget: root
         color: Appearance.colors.colPrimaryContainer
+
+        // Same scroll-to-set on the expanded card, for whichever timer it shows.
+        WheelHandler {
+            onWheel: (event) => {
+                const steps = Math.sign(event.angleDelta.y);
+                if (steps === 0) return;
+                root.stepTimer(root.expandedTimer, steps, (event.modifiers & Qt.ShiftModifier) !== 0);
+                event.accepted = true;
+            }
+        }
 
         ColumnLayout {
             anchors {

@@ -164,6 +164,17 @@ AbstractBackgroundWidget {
             z: -2
         }
 
+        // The wheel walks the day plan a day at a time, the same step the card's own
+        // arrows take.
+        WheelHandler {
+            onWheel: (event) => {
+                const steps = Math.sign(event.angleDelta.y);
+                if (steps === 0) return;
+                root.step(steps > 0 ? -1 : 1);
+                event.accepted = true;
+            }
+        }
+
         ColumnLayout {
             anchors {
                 fill: parent
