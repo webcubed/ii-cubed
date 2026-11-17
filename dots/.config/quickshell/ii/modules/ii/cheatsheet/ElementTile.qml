@@ -6,11 +6,64 @@ import QtQuick
 RippleButton {
     id: root
     required property var element
-    opacity: element.type != "empty" ? 1 : 0
+
+    // Search state shared by every tile; set by CheatsheetPeriodicTable.
+    property string query: ""
+    property bool isSelected: false
+    property int period: 0
+    property int group: 0
+    property bool isSeries: false
+
+    signal picked(var element)
+
+    readonly property bool empty: element.type === "empty"
+    readonly property bool matched: {
+        if (root.query.length === 0)
+            return true;
+        if (root.empty)
+            return false;
+        const q = root.query.toLowerCase();
+        return String(root.element.number) === q
+            || String(root.element.symbol).toLowerCase().startsWith(q)
+            || String(root.element.name).toLowerCase().includes(q);
+    }
+
+    function categoryColor(type) {
+        switch (type) {
+        case "metal": return Appearance.colors.colPrimary;
+        case "nonmetal": return Appearance.colors.colSecondary;
+        case "noblegas": return Appearance.colors.colTertiary;
+        case "lanthanum": return Appearance.colors.colError;
+        case "actinium": return ColorUtils.mix(Appearance.colors.colError, Appearance.colors.colTertiary, 0.45);
+        default: return Appearance.colors.colSubtext;
+        }
+    }
+
+    readonly property color category: root.categoryColor(root.element.type)
+    readonly property color tileBackground: ColorUtils.transparentize(root.category, root.isSelected ? 0.72 : 0.86)
+
+    opacity: root.empty ? 0 : (root.query.length > 0 && !root.matched ? 0.25 : 1)
+    Behavior on opacity {
+        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
+
     implicitHeight: 70
     implicitWidth: 70
-    colBackground: Appearance.colors.colLayer2
+    colBackground: root.empty ? Appearance.colors.colLayer2 : root.tileBackground
+    colBackgroundHover: ColorUtils.transparentize(root.category, 0.72)
+    colBackgroundActive: ColorUtils.transparentize(root.category, 0.6)
     buttonRadius: Appearance.rounding.small
+    enabled: !root.empty
+    onClicked: root.picked(root.element)
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Appearance.rounding.small
+        color: "transparent"
+        border.width: 2
+        border.color: root.category
+        visible: root.isSelected
+    }
 
     Rectangle {
         anchors {
@@ -59,7 +112,7 @@ RippleButton {
     StyledText {
         id: elementSymbol
         anchors.centerIn: parent
-        color: Appearance.colors.colSecondary
+        color: root.category
         font.pixelSize: Appearance.font.pixelSize.huge
         text: root.element.symbol
     }
@@ -71,6 +124,9 @@ RippleButton {
             bottom: parent.bottom
             bottomMargin: 4
         }
+        width: parent.width - 8
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
         font.pixelSize: Appearance.font.pixelSize.smallest
         color: Appearance.colors.colOnLayer2
         text: root.element.name
