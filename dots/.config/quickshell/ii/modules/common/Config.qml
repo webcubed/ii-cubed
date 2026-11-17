@@ -1423,6 +1423,9 @@ Singleton {
                     property string keybinds: "<"
                     property string symbols: "."
                     property string authenticator: "!" // TOTP codes
+                    property string dictionary: "d" // word lookups ("d word")
+                    property string urban: "ud" // Urban Dictionary ("ud term")
+                    property string translation: "t" // translation ("t text")
                 }
                 property JsonObject imageSearch: JsonObject {
                     property string imageSearchEngineBaseUrl: "https://lens.google.com/uploadbyurl?url="

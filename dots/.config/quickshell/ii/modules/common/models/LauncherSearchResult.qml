@@ -16,6 +16,14 @@ QtObject {
     // When set, the delegate renders that authenticator's live TOTP code and
     // countdown next to the entry (see Authenticator.qml).
     property string liveAuthenticatorId: ""
+    // Upcoming code rows: -1 shows the live code chip, >= 0 renders the nth
+    // upcoming code (and its countdown) inside the delegate.
+    property int liveUpcomingIndex: -1
+    // When set, activating the entry navigates to this query instead of
+    // executing it (Flow Launcher style submenus).
+    property string drillQuery: ""
+    // Lines the name may wrap to; definitions need more than one.
+    property int maxLines: 1
     property bool blurImage: false
     property var execute: () => {
         print("Not implemented");

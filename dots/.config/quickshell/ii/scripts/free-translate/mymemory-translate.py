@@ -64,15 +64,32 @@ def main():
     payload = json.load(sys.stdin)
     target = normalize_lang(payload.get("target"))
     out = []
-    try:
-        for s in payload.get("strings", []):
+    first_error = None
+    translated_any = False
+
+    for s in payload.get("strings", []):
+        # OCR often yields blank/whitespace blocks; MyMemory answers those with
+        # "NO QUERY SPECIFIED", which must not abort the whole batch.
+        if not s or not s.strip():
+            out.append({"translatedText": s or ""})
+            continue
+        try:
             parts = []
             for c in chunk_text(s):
+                if not c.strip():
+                    continue
                 parts.append(translate_chunk(c, target))
                 time.sleep(REQUEST_PAUSE)  # pace the chunk requests
-            out.append({"translatedText": " ".join(parts)})
-    except Exception as e:  # surface as API error for TranslatorApi.handleApiOutput
-        json.dump({"error": {"code": 500, "message": str(e)}}, sys.stdout)
+            out.append({"translatedText": " ".join(parts) if parts else s})
+            translated_any = True
+        except Exception as e:
+            # Keep the original text for this block instead of failing everything.
+            first_error = first_error or e
+            out.append({"translatedText": s})
+
+    # Only surface an error if nothing at all could be translated (e.g. quota).
+    if not translated_any and first_error is not None:
+        json.dump({"error": {"code": 500, "message": str(first_error)}}, sys.stdout)
         return
     json.dump({"translations": out}, sys.stdout)
 

@@ -351,11 +351,20 @@ def cmd_stream(args):
                                  service["period"], service["algorithm"], now)
             except (OtpError, ValueError, base64.binascii.Error):
                 continue
+            upcoming = []
+            for step in (1, 2, 3):
+                try:
+                    upcoming.append(totp_code(
+                        service["secret"], service["digits"], service["period"],
+                        service["algorithm"], now + step * service["period"]))
+                except (OtpError, ValueError, base64.binascii.Error):
+                    break
             codes.append({
                 "id": service["id"],
                 "code": code,
                 "period": service["period"],
                 "remaining": _seconds_left(service["period"], now),
+                "upcoming": upcoming,
             })
         emit({"type": "codes", "services": codes})
         # Wake on the next second boundary so the countdown stays accurate.

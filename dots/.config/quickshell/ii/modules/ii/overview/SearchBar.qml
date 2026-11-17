@@ -19,7 +19,12 @@ RowLayout {
         searchInput.forceActiveFocus();
     }
 
-    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, Authenticator, DefaultSearch }
+    enum SearchPrefixType { Action, App, Clipboard, Emojis, Math, ShellCommand, WebSearch, Authenticator, Dictionary, Urban, Translation, DefaultSearch }
+
+    /// Word lookups use "d " rather than "d" so plain typing is untouched.
+    function isWordPrefix(prefix) {
+        return root.searchingText === prefix || root.searchingText.startsWith(prefix + " ");
+    }
 
     property var searchPrefixType: {
         if (root.searchingText.startsWith(Config.options.search.prefix.action)) return SearchBar.SearchPrefixType.Action;
@@ -30,6 +35,9 @@ RowLayout {
         if (root.searchingText.startsWith(Config.options.search.prefix.shellCommand)) return SearchBar.SearchPrefixType.ShellCommand;
         if (root.searchingText.startsWith(Config.options.search.prefix.webSearch)) return SearchBar.SearchPrefixType.WebSearch;
         if (root.searchingText.startsWith(Config.options.search.prefix.authenticator)) return SearchBar.SearchPrefixType.Authenticator;
+        if (root.isWordPrefix(Config.options.search.prefix.dictionary)) return SearchBar.SearchPrefixType.Dictionary;
+        if (root.isWordPrefix(Config.options.search.prefix.urban)) return SearchBar.SearchPrefixType.Urban;
+        if (root.isWordPrefix(Config.options.search.prefix.translation)) return SearchBar.SearchPrefixType.Translation;
         return SearchBar.SearchPrefixType.DefaultSearch;
     }
     
@@ -46,6 +54,9 @@ RowLayout {
             case SearchBar.SearchPrefixType.ShellCommand: return MaterialShape.Shape.PixelCircle;
             case SearchBar.SearchPrefixType.WebSearch: return MaterialShape.Shape.SoftBurst;
             case SearchBar.SearchPrefixType.Authenticator: return MaterialShape.Shape.Diamond;
+            case SearchBar.SearchPrefixType.Dictionary: return MaterialShape.Shape.Arch;
+            case SearchBar.SearchPrefixType.Urban: return MaterialShape.Shape.Burst;
+            case SearchBar.SearchPrefixType.Translation: return MaterialShape.Shape.Fan;
             default: return MaterialShape.Shape.Cookie7Sided;
         }
         text: switch (root.searchPrefixType) {
@@ -57,6 +68,9 @@ RowLayout {
             case SearchBar.SearchPrefixType.ShellCommand: return "terminal";
             case SearchBar.SearchPrefixType.WebSearch: return "travel_explore";
             case SearchBar.SearchPrefixType.Authenticator: return "key";
+            case SearchBar.SearchPrefixType.Dictionary: return "menu_book";
+            case SearchBar.SearchPrefixType.Urban: return "local_fire_department";
+            case SearchBar.SearchPrefixType.Translation: return "translate";
             case SearchBar.SearchPrefixType.DefaultSearch: return "search";
             default: return "search";
         }
@@ -68,9 +82,15 @@ RowLayout {
         implicitHeight: 40
         focus: GlobalStates.overviewOpen
         font.pixelSize: Appearance.font.pixelSize.small
-        placeholderText: root.searchPrefixType === SearchBar.SearchPrefixType.Authenticator
-            ? Translation.tr("Search authenticator codes")
-            : Translation.tr("Search, calculate or run")
+        placeholderText: {
+            switch (root.searchPrefixType) {
+            case SearchBar.SearchPrefixType.Authenticator: return Translation.tr("Search authenticator codes");
+            case SearchBar.SearchPrefixType.Dictionary: return Translation.tr("Look up a word — word!s for synonyms");
+            case SearchBar.SearchPrefixType.Urban: return Translation.tr("Search Urban Dictionary — term!e for examples");
+            case SearchBar.SearchPrefixType.Translation: return Translation.tr("Translate — English ⇄ 中文, pinyin included");
+            default: return Translation.tr("Search, calculate or run");
+            }
+        }
         implicitWidth: root.searchingText == "" ? Appearance.sizes.searchWidthCollapsed : Appearance.sizes.searchWidth
 
         Behavior on implicitWidth {

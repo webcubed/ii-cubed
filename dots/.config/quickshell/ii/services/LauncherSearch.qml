@@ -14,12 +14,27 @@ Singleton {
 
     property string query: ""
 
+    readonly property var knownPrefixes: [
+        Config.options.search.prefix.action, Config.options.search.prefix.app,
+        Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis,
+        Config.options.search.prefix.math, Config.options.search.prefix.shellCommand,
+        Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch,
+        Config.options.search.prefix.authenticator, Config.options.search.prefix.dictionary + " ",
+        Config.options.search.prefix.urban + " ", Config.options.search.prefix.translation + " "
+    ]
+
     function ensurePrefix(prefix) {
-        if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch, Config.options.search.prefix.fileSearch, Config.options.search.prefix.authenticator].some(i => root.query.startsWith(i))) {
-            root.query = prefix + root.query.slice(1);
-        } else {
-            root.query = prefix + root.query;
-        }
+        const matched = root.knownPrefixes.find(item => item.length > 0 && root.query.startsWith(item));
+        root.query = prefix + (matched ? root.query.slice(matched.length) : root.query);
+    }
+
+    /// "d word" style prefixes only count when followed by a space.
+    function _wordPrefixQuery(prefix) {
+        if (root.query === prefix)
+            return "";
+        if (root.query.startsWith(prefix + " "))
+            return root.query.slice(prefix.length + 1);
+        return null;
     }
 
     // https://specifications.freedesktop.org/menu/latest/category-registry.html
@@ -183,8 +198,41 @@ Singleton {
         },
     ]
 
-    // Combined built-in and user actions
-    property var allActions: searchActions.concat(userActionScripts)
+    // Combined built-in and user actions, enriched with palette metadata
+    property var allActions: searchActions.concat(userActionScripts).map(action => Object.assign({
+        "icon": "settings_suggest",
+        "description": Translation.tr("Custom action")
+    }, root.actionMeta[action.action] ?? {}, action))
+
+    /// Turns a LauncherMenu descriptor into a launcher result object.
+    function _resultFromDescriptor(descriptor) {
+        if (!descriptor)
+            return null;
+        const iconType = descriptor.iconType === "system" ? LauncherSearchResult.IconType.System
+            : descriptor.iconType === "text" ? LauncherSearchResult.IconType.Text
+            : descriptor.iconType === "none" ? LauncherSearchResult.IconType.None
+            : LauncherSearchResult.IconType.Material;
+        const result = resultComp.createObject(null, {
+            "type": descriptor.type ?? "",
+            "name": descriptor.name ?? "",
+            "verb": descriptor.verb ?? "",
+            "iconName": descriptor.icon ?? "",
+            "iconType": iconType,
+            "fontType": descriptor.fontType === "monospace" ? LauncherSearchResult.FontType.Monospace : LauncherSearchResult.FontType.Normal,
+            "maxLines": descriptor.maxLines ?? 1,
+            "liveAuthenticatorId": descriptor.liveAuthenticatorId ?? "",
+            "liveUpcomingIndex": descriptor.liveUpcomingIndex ?? -1,
+            "drillQuery": descriptor.drill ?? "",
+            "execute": descriptor.execute ?? (() => {}),
+            "actions": (descriptor.actions ?? []).map(action => resultComp.createObject(null, {
+                "name": action.name ?? "",
+                "iconName": action.icon ?? "",
+                "iconType": LauncherSearchResult.IconType.Material,
+                "execute": action.execute ?? (() => {})
+            }))
+        });
+        return result;
+    }
 
     property string mathResult: ""
 
@@ -233,11 +281,50 @@ Singleton {
         }
     }
 
+    readonly property var actionMeta: ({
+        "accentcolor": { "icon": "palette", "description": Translation.tr("Set the accent colour") },
+        "auth": { "icon": "key", "description": Translation.tr("Authenticator services and codes") },
+        "dark": { "icon": "dark_mode", "description": Translation.tr("Switch to the dark theme") },
+        "genius": { "icon": "lyrics", "description": Translation.tr("Save a Genius API key") },
+        "hypridle": { "icon": "bedtime", "description": Translation.tr("Start hypridle") },
+        "konachanwallpaper": { "icon": "wallpaper", "description": Translation.tr("Random Konachan wallpaper") },
+        "light": { "icon": "light_mode", "description": Translation.tr("Switch to the light theme") },
+        "lock": { "icon": "lock", "description": Translation.tr("Lock the session") },
+        "logout": { "icon": "logout", "description": Translation.tr("Log out") },
+        "poweroff": { "icon": "power_settings_new", "description": Translation.tr("Power off") },
+        "reboot": { "icon": "restart_alt", "description": Translation.tr("Reboot") },
+        "superpaste": { "icon": "content_paste_go", "description": Translation.tr("Paste several clipboard entries") },
+        "suspend": { "icon": "nights_stay", "description": Translation.tr("Suspend to RAM") },
+        "todo": { "icon": "checklist", "description": Translation.tr("Add a task") },
+        "wallpaper": { "icon": "image", "description": Translation.tr("Open the wallpaper selector") },
+        "wipeclipboard": { "icon": "delete_sweep", "description": Translation.tr("Clear the clipboard history") }
+    })
+
     onQueryChanged: {
         let expr = root.query;
         if (expr.startsWith(Config.options.search.prefix.fileSearch)) {
             expr = expr.slice(Config.options.search.prefix.fileSearch.length);
             fileProc.searchFiles(expr);
+        }
+
+        const dictionaryQuery = root._wordPrefixQuery(Config.options.search.prefix.dictionary);
+        if (dictionaryQuery !== null) {
+            const word = LauncherMenu.parseWordQuery(dictionaryQuery).word.split(">")[0].trim();
+            if (word.length > 0 && (word.toLowerCase() !== Dictionary.word || (!Dictionary.loading && !Dictionary.entry && Dictionary.error.length === 0)))
+                Dictionary.lookup(word);
+        }
+        const urbanQuery = root._wordPrefixQuery(Config.options.search.prefix.urban);
+        if (urbanQuery !== null) {
+            const term = LauncherMenu.parseWordQuery(urbanQuery).word.split(">")[0].trim();
+            if (term.length > 0 && (term.toLowerCase() !== UrbanDictionary.term || (!UrbanDictionary.loading && UrbanDictionary.entries.length === 0 && UrbanDictionary.error.length === 0)))
+                UrbanDictionary.lookup(term);
+        }
+        const translationQuery = root._wordPrefixQuery(Config.options.search.prefix.translation);
+        if (translationQuery !== null) {
+            const parsed = TranslationService.parse(translationQuery);
+            const raw = translationQuery.trim();
+            if (parsed.text.length > 0 && (raw !== TranslationService.lastQuery || (!TranslationService.loading && TranslationService.translation.length === 0 && TranslationService.error.length === 0)))
+                TranslationService.translate(raw);
         }
     }
 
@@ -284,6 +371,31 @@ Singleton {
             return [];
 
         ///////////// Special cases ///////////////
+        if (root.query.startsWith(Config.options.search.prefix.action)) {
+            return CommandPalette.rows(Config.options.search.prefix.action,
+                StringUtils.cleanPrefix(root.query, Config.options.search.prefix.action), root.allActions,
+                Config.options.search.prefix.authenticator)
+                .map(root._resultFromDescriptor).filter(Boolean);
+        }
+
+        const dictionaryQuery = root._wordPrefixQuery(Config.options.search.prefix.dictionary);
+        if (dictionaryQuery !== null) {
+            return DictionaryMenu.rows(Config.options.search.prefix.dictionary, dictionaryQuery)
+                .map(root._resultFromDescriptor).filter(Boolean);
+        }
+
+        const urbanQuery = root._wordPrefixQuery(Config.options.search.prefix.urban);
+        if (urbanQuery !== null) {
+            return UrbanMenu.rows(Config.options.search.prefix.urban, urbanQuery)
+                .map(root._resultFromDescriptor).filter(Boolean);
+        }
+
+        const translationQuery = root._wordPrefixQuery(Config.options.search.prefix.translation);
+        if (translationQuery !== null) {
+            return TranslationMenu.rows(Config.options.search.prefix.translation, translationQuery)
+                .map(root._resultFromDescriptor).filter(Boolean);
+        }
+
         if (root.query.startsWith(Config.options.search.prefix.clipboard)) {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.clipboard);
@@ -321,24 +433,10 @@ Singleton {
                 });
             }).filter(Boolean);
         } else if (root.query.startsWith(Config.options.search.prefix.authenticator)) {
-            // Authenticator codes: Enter copies the highlighted code
-            const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.authenticator).trim();
-            return Authenticator.search(searchString).map(service => {
-                return resultComp.createObject(null, {
-                    type: service.issuer ? `${Translation.tr("Authenticator")} · ${service.issuer}` : Translation.tr("Authenticator"),
-                    id: service.id,
-                    name: service.name || service.issuer,
-                    iconName: "key",
-                    iconType: LauncherSearchResult.IconType.Material,
-                    verb: Translation.tr("Copy"),
-                    // The delegate renders the code itself so it stays live
-                    // without rebuilding the result list.
-                    liveAuthenticatorId: service.id,
-                    execute: () => {
-                        Authenticator.copyCode(service.id);
-                    }
-                });
-            }).filter(Boolean);
+            // Authenticator: services, then a menu per service after a ">"
+            const authQuery = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.authenticator);
+            return AuthMenu.rows(Config.options.search.prefix.authenticator, authQuery)
+                .map(root._resultFromDescriptor).filter(Boolean);
         } else if (root.query.startsWith(Config.options.search.prefix.emojis)) {
             // Clipboard
             const searchString = StringUtils.cleanPrefix(root.query, Config.options.search.prefix.emojis);

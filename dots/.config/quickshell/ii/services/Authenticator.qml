@@ -113,6 +113,36 @@ Singleton {
         return code ? root.groupCode(code) : "· · ·  · · ·";
     }
 
+    /// Codes for the next few periods, with how long until each becomes current.
+    function upcomingFor(id) {
+        const entry = root.codes[id];
+        const service = root.serviceById(id);
+        if (!entry || !service)
+            return [];
+        const upcoming = entry.upcoming ?? [];
+        return upcoming.map((code, index) => ({
+            "code": String(code),
+            "startsIn": Number(entry.remaining ?? 0) + (index + 1) * Number(service.period ?? 30)
+        }));
+    }
+
+    function otpauthUri(service) {
+        if (!service)
+            return "";
+        const issuer = String(service.issuer ?? "");
+        const name = String(service.name ?? "");
+        const label = issuer.length > 0 && name.length > 0 ? `${issuer}:${name}` : (name || issuer);
+        const params = [
+            `secret=${encodeURIComponent(String(service.secret ?? ""))}`,
+            `digits=${service.digits}`,
+            `period=${service.period}`,
+            `algorithm=${String(service.algorithm ?? "SHA1").toUpperCase()}`
+        ];
+        if (issuer.length > 0)
+            params.push(`issuer=${encodeURIComponent(issuer)}`);
+        return `otpauth://totp/${encodeURIComponent(label)}?${params.join("&")}`;
+    }
+
     function search(query) {
         if (!root.authEnabled || root.services.length === 0)
             return [];
@@ -161,8 +191,6 @@ Singleton {
 
     function _copy(code, label) {
         Quickshell.clipboardText = code;
-        root.notify(label ? `${label} · ${root.groupCode(code)}` : root.groupCode(code),
-                    Translation.tr("Copied to clipboard"));
         if (root.clearClipboardAfter > 0) {
             clearTimer.code = code;
             clearTimer.restart();
@@ -328,10 +356,6 @@ Singleton {
         } else if (data.path !== undefined) {
             Quickshell.clipboardText = String(data.path);
             root.notify("Authenticator", Translation.tr("Exported %1 service(s) to %2").arg(data.count).arg(data.path));
-        } else if (data.removed !== undefined) {
-            root.notify("Authenticator", Translation.tr("Removed %1").arg(data.removed));
-        } else if (data.service !== undefined) {
-            root.notify("Authenticator", root.labelOf(data.service));
         }
         root.refresh();
     }
@@ -390,6 +414,7 @@ Singleton {
                     "id": String(service.id ?? ""),
                     "issuer": String(service.issuer ?? ""),
                     "name": String(service.name ?? ""),
+                    "secret": String(service.secret ?? ""),
                     "digits": Number(service.digits ?? 6),
                     "period": Number(service.period ?? 30),
                     "algorithm": String(service.algorithm ?? "SHA1")

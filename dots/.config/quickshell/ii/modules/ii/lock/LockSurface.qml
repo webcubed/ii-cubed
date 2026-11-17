@@ -416,7 +416,7 @@ MouseArea {
             Layout.alignment: Qt.AlignVCenter
             showSeparator: false
             showOverflowMenu: false
-            pinnedItems: SystemTray.items.values.filter(i => i.id == "Fcitx")
+            pinnedItems: TrayService.uniqueItems.filter(i => i.id == "Fcitx")
             visible: pinnedItems.length > 0
         }
     }

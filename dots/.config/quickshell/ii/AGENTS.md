@@ -370,9 +370,18 @@ image Ready + region change + visible) shown as a `cropOverlay` **sibling of
 rects outside the crop, border, 8 handles (4 corners + 4 sides, min 80 image
 px). Tools: pen/highlight/arrow/line/dash/dot/rect/ellipse/triangle/text on a
 `Canvas`; export (`withExported`) grabs the whole view, then a reused Process
-magick-crops it to `crop` (skipped when crop ≈ full) — `doCopy`/`doSave`/
-`doExternal` all go through it, so the external editor (satty via
-`useSatty ? satty : swappy`) receives the cropped, annotated result. RMB→Edit
+magick-crops it to `crop` **via `exportCrop()` + `cropScript`**: the rect is
+clamped to the capture and rounded (a negative/NaN/out-of-bounds rect makes
+`magick -crop` exit non-zero), and the crop is skipped when it ≈ the full
+image. The grab is device px while `crop` is image px, so `cropScript` lets
+ImageMagick measure the grab (`identify`, awk scaling) instead of dividing by
+`result.image.width` — that path produced `NaN` geometry on HiDPI/mismatched
+dpr and, because the old `onExited` dismissed on any non-zero exit, the whole
+export died silently and the clipboard kept the *previous* (unannotated) image.
+A failed crop now falls back to the uncropped annotated grab (stderr is logged)
+rather than throwing the snip away. `doCopy`/`doSave`/`doExternal` all go
+through it, so the external editor (satty via `useSatty ? satty : swappy`)
+receives the cropped, annotated result. RMB→Edit
 no longer remaps Edit→Copy on LMB: only `Copy + RMB` flips to Edit.
 Drop-ups: `property string openMenu` (`"" | "shape" | "arrow"`) drives ONE
 full-screen `menuHost` (z:11) that owns both menus + its close-backdrop —
@@ -484,6 +493,7 @@ qs.modules.ii.wallpaperSelector → modules/ii/wallpaperSelector/
 | `MprisController` | Media player control |
 | `Weather` | Weather data (wttr.in / open-meteo) |
 | `Cliphist` | Clipboard history |
+| `TrayService` | System tray items for the bar and lock screen. Collapses duplicate StatusNotifierItem registrations (`uniqueItems`, newest kept) because Quickshell never drops old ones and fcitx re-registers on every reload — that used to stack a keyboard icon per reload. |
 | `LauncherSearch` | Search results (apps, math, commands, web) |
 | `AppSearch` | Desktop entry search |
 | `TailscaleService` | Tailscale VPN management (connect/disconnect, exit nodes, peers) |
@@ -494,6 +504,12 @@ qs.modules.ii.wallpaperSelector → modules/ii/wallpaperSelector/
 | `TimerService` | Pomodoro cycles, persisted stopwatch (laps via `stopwatchRecordLap()`), and standalone countdown timer (`countdownSet(minutes)`, `countdownToggle()`, `countdownReset()`) |
 | `CalendarService` | khal/CalDAV calendar integration (Google Calendar via vdirsyncer). Events loaded via `khal list --json`. Provides `getTasksByDate(date)` and `addItem(item)`/`removeItem(item)`. |
 | `Todo` | File-based todo list (`todo.json`). Supports optional `deadline` field for calendar integration. `addTask(desc, deadline)`, `getTasksWithDeadline(date)`. |
+| `Authenticator` | TOTP codes in the launcher (`!` prefix by default). Streams codes from `scripts/authenticator/otp.py`; `/auth` commands add/remove/import/export. Store: `~/.config/illogical-impulse/authenticators.json`. See "Authenticator (TOTP Codes)". |
+| `Dictionary` | Word lookups for `d <word>` through dictionaryapi.dev (curl). Parsed entries, synonyms, examples and links. |
+| `UrbanDictionary` | Slang lookups for `ud <term>` through Urban Dictionary's JSON endpoint (curl). |
+| `TranslationService` | Translations for `t <text>` (MyMemory, no key) with tone-marked pinyin from zhconvert for the Chinese side. Not named `Translate`: that is a QtQuick built-in type. |
+| `LauncherMenu` | Shared launcher menu helpers: `copy`, `openUrl`, `backRow`, `noteRow`, `partOfSpeechIcon`, `parseWordQuery`. |
+| `AuthMenu` / `DictionaryMenu` / `UrbanMenu` / `TranslationMenu` / `CommandPalette` | One module per launcher surface, each building descriptor rows plus its submenu drill targets. |
 
 ## Google Calendar Integration
 
@@ -503,7 +519,6 @@ Calendar events sync via **vdirsyncer** → **khal** → **CalendarService**.
 1. `uv tool install vdirsyncer khal` (or `sudo pacman -S vdirsyncer khal`)
 2. Configure `~/.config/vdirsyncer/config` with Google OAuth credentials
 3. Run `vdirsyncer discover` (opens browser for auth)
-| `Authenticator` | TOTP codes in the launcher (`!` prefix by default). Streams codes from `scripts/authenticator/otp.py`; `/auth` commands add/remove/import/export. Store: `~/.config/illogical-impulse/authenticators.json`. See "Authenticator (TOTP Codes)". |
 4. Run `vdirsyncer sync` to pull events
 5. Configure `~/.config/khal/config` with calendar paths
 
@@ -516,15 +531,6 @@ Calendar events sync via **vdirsyncer** → **khal** → **CalendarService**.
 
 **Gotcha:** CalendarService uses `dd.MM.yyyy` date format for khal. The khal `longdateformat` must match.
 
-## Sidebar Pages (Left Sidebar Tabs)
-
-The left sidebar (`SidebarPoliciesContent.qml`) has tabs controlled by config flags:
-
-| Tab | Config Flag | Icon | Component |
-|-----|-------------|------|-----------|
-| AI | `Config.options.policies.ai !== 0` | `neurology` | `AiChat.qml` |
-| Translator | `Config.options.policies.translator !== 0` | `translate` | `Translator.qml` |
-| Media | `Config.options.policies.player !== 0` | `music_note` | `SidebarPlayerControl.qml` |
 ## Authenticator (TOTP Codes)
 
 QML has no crypto, so codes come from a Python backend that streams one JSON
@@ -557,6 +563,87 @@ Search-bar commands (`/auth …`, action prefix): `add <Issuer:account> <secret>
 `remove`, `rename`, `secret`, `set <label> key=value…`, `import [file]`,
 `export [json|uri] [file]`, `list`, `help`.
 
+## Launcher Menus, Lookups and Subcommands
+
+Search-bar surfaces are menus, not notifications. A row carries `drillQuery`
+when activating it should navigate (Flow Launcher style) instead of executing:
+`SearchItem.onClicked` then emits `navigate`, and `SearchWidget.setSearchingText()`
+applies it, so submenus are just query text and backspace/Escape walk back out.
+
+| Surface | Shape |
+|---------|-------|
+| `!` auth | services → `!<label> >` service menu (code, upcoming codes, secret, details, rename, change secret, delete) → `!<label> > rename ` / `secret ` text pages |
+| `d <word>` | definitions; `!d` definitions, `!s` synonyms/antonyms, `!e` examples, `!` links (Flow.Launcher.Dictionary format). `d <word> > <meaning>.<index>` is a definition page |
+| `ud <term>` | Urban Dictionary definitions; `!e` examples, `!` links. `ud <term> > <index>` is an entry page |
+| `t <text>` | Translate: English goes to Chinese, anything else goes to English, with tone-marked pinyin for whichever side is Chinese. `t en>fr <text>` / `t >ja <text>` picks the languages explicitly. `t <text> >` is the detail page |
+| `/` | command palette: every action with icon + description, drilling to `/cmd `; `/auth` lists its subcommands with argument skeletons |
+
+- Prefixes live in `Config.options.search.prefix` (`dictionary: "d"`, `urban: "ud"`,
+  `translation: "t"`).
+  Word prefixes only count when followed by a space — plain typing must not be
+  hijacked — hence `LauncherSearch._wordPrefixQuery()` and
+  `SearchBar.isWordPrefix()`.
+- One module per surface: `AuthMenu`, `DictionaryMenu`, `UrbanMenu`,
+  `TranslationMenu` and `CommandPalette`, each exposing `rows(...)`.
+  `LauncherMenu` only holds the shared helpers (`copy`, `openUrl`, `backRow`,
+  `noteRow`, `partOfSpeechIcon`, `parseWordQuery`). None of them takes an
+  action-prefix parameter it does not use.
+- They return plain descriptor objects
+  (`{type, name, verb, icon, iconType, fontType, maxLines,
+  liveAuthenticatorId, liveUpcomingIndex, drill, execute, actions}`);
+  `LauncherSearch._resultFromDescriptor()` turns them into
+  `LauncherSearchResult`s. Keep widget imports out of them.
+- **Never build rows from a value that changes on a timer.** Reading
+  `Authenticator.codes` in a menu rebuilt the results list every second and the
+  selection jumped back to the top while scrolling. Upcoming-code rows carry
+  only `liveAuthenticatorId` + `liveUpcomingIndex`; `SearchItem` reads the code
+  and countdown in the delegate (`displayNameText` / `displayTypeText`), and
+  the copy closures resolve the code when activated, not when built.
+- `/auth` validates while you type and only runs a valid action, so bad syntax
+  never needs a notification: rows show "No service matches", "That secret
+  isn't base32", etc. Copying a code is silent, and add/remove/rename no longer
+  toast on success (import/export still report their outcome).
+- Definitions need multiple lines: `LauncherSearchResult.maxLines` drives
+  `SearchItem`'s wrap/maximumLineCount. Long type lines are elided so the verb
+  and action buttons never get pushed off the row.
+- `Config.options.search.prefix` defaults do **not** reach an existing
+  `~/.config/illogical-impulse/config.json`: the saved object wins, so a new
+  prefix key must be added to that file too (otherwise the shell sees it as
+  `undefined` and the prefix silently falls through to normal search).
+- Never name a singleton after a QtQuick type. `Translate.qml` made the whole
+  shell fail to reload with `Composite Singleton Type Translate is not
+  creatable`, because QML already has a `Translate` transform — hence
+  `TranslationService`.
+
+## Translation and Pinyin
+
+`TranslationService.qml` parses the query first: `parse()` strips an optional
+`<from>><to>` language spec and a trailing `>` detail marker. Without a spec the
+direction is guessed (`looksEnglish()`: Han/kana/hangul or accented Latin →
+English, otherwise → 中文), so English goes to Chinese and everything else goes
+to English. Explicit pairs go straight to MyMemory's `langpair`, source may be
+empty (`>ja` = Autodetect). It then asks zhconvert's `Pinyin` converter for the
+Chinese side. zhconvert answers in numbered tones
+(`ni3 hao3`); `numberedToToneMarks()` converts them to diacritics
+(`nǐ hǎo`) — Google's `translate_a` endpoint is not reachable from this network
+("automated queries" page), so it is not used. Pinyin is shown as its own row on
+the result and detail pages, and follows `pinyinOf` (`source` or `translation`).
+
+Language codes are normalised in `normaliseLanguage()` (`zh`/`cn`/`chinese` →
+`zh-CN`, `jp` → `ja`, …) and listed in `languageNames`; unknown codes fall back
+to the guessed direction rather than erroring. `directionLabel()` renders the
+"English → Français" type line, `detectedSource` keeps MyMemory's detected
+language so the detail page can offer the reverse translation.
+
+## Sidebar Pages (Left Sidebar Tabs)
+
+The left sidebar (`SidebarPoliciesContent.qml`) has tabs controlled by config flags:
+
+| Tab | Config Flag | Icon | Component |
+|-----|-------------|------|-----------|
+| AI | `Config.options.policies.ai !== 0` | `neurology` | `AiChat.qml` |
+| Translator | `Config.options.policies.translator !== 0` | `translate` | `Translator.qml` |
+| Media | `Config.options.policies.player !== 0` | `music_note` | `SidebarPlayerControl.qml` |
 | Wallpapers | `Config.options.policies.wallpapers !== 0` | `wallpaper` | `WallpaperBrowserUI.qml` |
 | Anime | `Config.options.policies.weeb !== 0` | `bookmark_heart` | `Anime.qml` |
 | Tailscale | `Config.options.policies.tailscale !== 0` | `hub` | `TailscalePage.qml` |

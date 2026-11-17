@@ -35,11 +35,28 @@ RippleButton {
     property string cliphistRawString: entry?.rawValue ?? ""
     property string filePath: Images.isValidImageByName(entry?.name) ? entry?.name : ""
     property bool blurImage: entry?.blurImage ?? false
+    property string drillQuery: entry?.drillQuery ?? ""
+    property int nameLines: entry?.maxLines ?? 1
+
+    signal navigate(string query)
 
     // Authenticator entries show their live code, so the code ticks with the
     // Authenticator service instead of being baked into the entry name.
     readonly property string liveAuthenticatorId: entry?.liveAuthenticatorId ?? ""
     readonly property bool isAuthenticator: root.liveAuthenticatorId !== ""
+    // Upcoming-code rows carry only an index; the code and countdown are read
+    // here so the results list never rebuilds as the code stream ticks.
+    property int liveUpcomingIndex: entry?.liveUpcomingIndex ?? -1
+    readonly property bool isUpcomingCode: root.isAuthenticator && root.liveUpcomingIndex >= 0
+    readonly property var upcomingEntry: root.isUpcomingCode
+        ? (Authenticator.upcomingFor(root.liveAuthenticatorId)[root.liveUpcomingIndex] ?? null)
+        : null
+    readonly property string displayNameText: root.isUpcomingCode
+        ? (root.upcomingEntry ? Authenticator.groupCode(root.upcomingEntry.code) : "· · · · · ·")
+        : root.itemName
+    readonly property string displayTypeText: root.isUpcomingCode
+        ? (root.upcomingEntry ? Translation.tr("In %1s").arg(root.upcomingEntry.startsIn) : Translation.tr("Upcoming"))
+        : root.itemType
     readonly property string authenticatorCode: root.isAuthenticator ? Authenticator.codeFor(root.liveAuthenticatorId) : ""
     readonly property int authenticatorRemaining: root.isAuthenticator ? Authenticator.remainingFor(root.liveAuthenticatorId) : 0
     readonly property real authenticatorProgress: {
@@ -99,7 +116,7 @@ RippleButton {
 
         return result;
     }
-    property string displayContent: highlightContent(root.itemName, root.query)
+    property string displayContent: highlightContent(root.displayNameText, root.query)
 
     property list<string> urls: {
         if (!root.itemName) return [];
@@ -119,6 +136,10 @@ RippleButton {
     }
 
     onClicked: {
+        if (root.drillQuery.length > 0) {
+            root.navigate(root.drillQuery);
+            return;
+        }
         GlobalStates.overviewOpen = false
         root.itemExecute()
     }
@@ -201,10 +222,12 @@ RippleButton {
             Layout.alignment: Qt.AlignVCenter
             spacing: 0
             StyledText {
+                Layout.fillWidth: true
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 color: root.selected ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colSubtext
-                visible: root.itemType && root.itemType != Translation.tr("App")
-                text: root.itemType
+                visible: root.displayTypeText && root.displayTypeText != Translation.tr("App")
+                text: root.displayTypeText
+                elide: Text.ElideRight
             }
             RowLayout {
                 Loader { // Checkmark for copied clipboard entry
@@ -241,7 +264,9 @@ RippleButton {
                     color: root.colForeground
                     horizontalAlignment: Text.AlignLeft
                     elide: Text.ElideRight
-                    text: root.selected ? StringUtils.escapeHtml(root.itemName) : root.displayContent
+                    wrapMode: root.nameLines > 1 ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
+                    maximumLineCount: root.nameLines
+                    text: root.selected ? StringUtils.escapeHtml(root.displayNameText) : root.displayContent
                 }
             }
             Loader { // Clipboard image preview
@@ -271,8 +296,9 @@ RippleButton {
         ColumnLayout {
             Layout.alignment: Qt.AlignVCenter
             Layout.leftMargin: 10
+            Layout.rightMargin: 10
             spacing: 3
-            visible: root.isAuthenticator
+            visible: root.isAuthenticator && !root.isUpcomingCode
 
             StyledText {
                 id: authenticatorCodeText
@@ -286,10 +312,16 @@ RippleButton {
 
             RowLayout {
                 Layout.alignment: Qt.AlignRight
+                Layout.fillWidth: false
                 spacing: 5
 
+                // Fixed width: the column is as wide as the code digits, which are
+                // proportional, so a filling bar came out a different length per row.
                 Rectangle {
+                    Layout.fillWidth: false
                     Layout.preferredWidth: 42
+                    Layout.minimumWidth: 42
+                    Layout.maximumWidth: 42
                     implicitHeight: 3
                     radius: Appearance.rounding.full
                     color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.75)
