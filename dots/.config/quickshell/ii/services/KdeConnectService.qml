@@ -451,6 +451,10 @@ Singleton {
     }
 
     function startMonitor() {
+        // restartTimer can fire long after the Phone policy was switched off;
+        // without this the monitor (and its ~30 MB python process) outlives the
+        // tab it feeds, because only on_EnabledChanged tears it down.
+        if (!root._enabled) return
         if (monitorProc.running) return
         cleanupProc.running = true
     }
