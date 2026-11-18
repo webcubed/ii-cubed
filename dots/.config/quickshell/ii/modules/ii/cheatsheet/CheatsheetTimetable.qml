@@ -24,15 +24,25 @@ Item {
         var d = new Date().getDay();
         return (d - Config.options.time.firstDayOfWeek + 6) % 7;
     }
+    // Config options.time.firstDayOfWeek counts 0=Monday … 6=Sunday, while
+    // Date.getDay() counts 0=Sunday … 6=Saturday.
+    readonly property int weekStartDay: (Config.options.time.firstDayOfWeek + 1) % 7
+
+    /** Midnight of the first day of the shown week, respecting the configured
+     *  first day of the week instead of always starting on Monday. */
+    function weekStartDate(offset) {
+        var d = new Date();
+        var back = (d.getDay() - root.weekStartDay + 7) % 7;
+        d.setDate(d.getDate() - back + offset * 7);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }
+
     readonly property string weekLabel: {
-        var now = new Date();
-        var monday = new Date(now);
-        var dow = now.getDay();
-        var diff = dow === 0 ? -6 : 1 - dow;
-        monday.setDate(now.getDate() + diff + weekOffset * 7);
-        var sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        return Qt.formatDate(monday, "MMM d") + " - " + Qt.formatDate(sunday, "MMM d") + ", " + Qt.formatDate(sunday, "yyyy");
+        var start = root.weekStartDate(root.weekOffset);
+        var end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        return Qt.formatDate(start, "MMM d") + " - " + Qt.formatDate(end, "MMM d") + ", " + Qt.formatDate(end, "yyyy");
     }
 
     implicitWidth: 700
@@ -43,16 +53,11 @@ Item {
 
     function buildWeek() {
         var result = [];
-        var now = new Date();
-        var dow = now.getDay();
-        var diff = dow === 0 ? -6 : 1 - dow;
-        var monday = new Date(now);
-        monday.setDate(now.getDate() + diff + weekOffset * 7);
-        monday.setHours(0, 0, 0, 0);
+        var firstDay = root.weekStartDate(root.weekOffset);
         var weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         for (var i = 0; i < 7; i++) {
-            var dayDate = new Date(monday);
-            dayDate.setDate(monday.getDate() + i);
+            var dayDate = new Date(firstDay);
+            dayDate.setDate(firstDay.getDate() + i);
             var dayEvents = CalendarService.getTasksByDate(dayDate);
             var formattedEvents = [];
             for (var j = 0; j < dayEvents.length; j++) {
