@@ -20,26 +20,21 @@ Item {
     readonly property int dayCount: 7
     readonly property real availableWidth: width - timeColumnWidth - (dayCount + 1) * spacing
     readonly property real dayColumnWidth: Math.max(60, availableWidth / dayCount)
-    readonly property int currentDayIndex: {
-        var d = new Date().getDay();
-        return (d - Config.options.time.firstDayOfWeek + 6) % 7;
-    }
-    // Config options.time.firstDayOfWeek counts 0=Monday … 6=Sunday, while
-    // Date.getDay() counts 0=Sunday … 6=Saturday.
+    // The config counts 0=Monday … 6=Sunday, Date.getDay() counts 0=Sunday … 6=Saturday.
     readonly property int weekStartDay: (Config.options.time.firstDayOfWeek + 1) % 7
+    readonly property int currentDayIndex: (new Date().getDay() - root.weekStartDay + 7) % 7
 
-    /** Midnight of the first day of the shown week, respecting the configured
-     *  first day of the week instead of always starting on Monday. */
-    function weekStartDate(offset) {
+    /** Midnight of the first day of the shown week. */
+    function weekStartDate() {
         var d = new Date();
         var back = (d.getDay() - root.weekStartDay + 7) % 7;
-        d.setDate(d.getDate() - back + offset * 7);
+        d.setDate(d.getDate() - back + root.weekOffset * 7);
         d.setHours(0, 0, 0, 0);
         return d;
     }
 
     readonly property string weekLabel: {
-        var start = root.weekStartDate(root.weekOffset);
+        var start = root.weekStartDate();
         var end = new Date(start);
         end.setDate(start.getDate() + 6);
         return Qt.formatDate(start, "MMM d") + " - " + Qt.formatDate(end, "MMM d") + ", " + Qt.formatDate(end, "yyyy");
@@ -53,7 +48,7 @@ Item {
 
     function buildWeek() {
         var result = [];
-        var firstDay = root.weekStartDate(root.weekOffset);
+        var firstDay = root.weekStartDate();
         var weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         for (var i = 0; i < 7; i++) {
             var dayDate = new Date(firstDay);
