@@ -527,7 +527,13 @@ Calendar events sync via **vdirsyncer** → **khal** → **CalendarService**.
 - `~/.config/khal/config` — khal calendar discovery config
 - `~/.vdirsyncer/google_token` — OAuth token (auto-generated)
 
-**Auto-sync:** Add to crontab: `*/15 * * * * vdirsyncer sync >> /tmp/vdirsyncer.log 2>&1`
+**Auto-sync (opt-in):** `Config.options.calendar.sync.enable` defaults to `false`. When on, ii runs the sync itself; `onStartup`, `intervalMinutes` (0 turns the timer off) and `command` (run through `bash -lc`) control it. A cron entry is no longer needed. The settings page shows the last sync time or error and has a "Sync now" button, which works even with automatic sync off.
+
+**Calendars:** `Config.options.calendar.disabledCalendars` lists names from `khal printcalendars` that ii ignores; the settings page lists every khal calendar and toggles them one by one. Disabled names are passed to khal as repeated `--exclude-calendar` args, so the query never fetches them; a toggle re-runs the query. khal does not take calendar names positionally, so filtering cannot happen there.
+
+**New Google calendars:** `collections = ["from a"]` in the vdirsyncer config syncs whatever exists remotely, but khal only reads calendars that have their own `[[name]]` block. After creating a calendar in Google: `vdirsyncer discover google_calendars`, then `vdirsyncer sync`, then add a `[[name]]` block to `~/.config/khal/config` and reload the shell.
+
+**Binary paths:** `Config.options.calendar.khalPath` defaults to empty, which looks khal up on the login shell's PATH and then falls back to `~/.local/bin/khal`. The sync command is a plain string, so a full path (or `uv tool run vdirsyncer sync`) works when PATH does not have it.
 
 **Gotcha:** CalendarService uses `dd.MM.yyyy` date format for khal. The khal `longdateformat` must match.
 

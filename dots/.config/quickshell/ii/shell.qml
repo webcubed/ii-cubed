@@ -32,6 +32,9 @@ ShellRoot {
         Cliphist.refresh()
         Wallpapers.load()
         Updates.load()
+        // Calendar sync runs in the background, even before a calendar widget
+        // or the cheat sheet timetable is opened.
+        CalendarService.syncEnabled
         // Touch BluetoothAgent so the BlueZ pairing agent registers
         // immediately, not on first pairing prompt.
         BluetoothAgent.ready

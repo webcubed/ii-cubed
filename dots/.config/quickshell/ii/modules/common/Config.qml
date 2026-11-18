@@ -1040,6 +1040,19 @@ Singleton {
 
             property JsonObject calendar: JsonObject {
                 property string locale: "en-GB"
+
+                // Google Calendar arrives through vdirsyncer into local calendars
+                // that khal reads. Both tools are configured per user
+                // (~/.config/vdirsyncer, ~/.config/khal); these options only say
+                // where ii finds them and whether ii keeps them synced.
+                property string khalPath: "" // Empty: look up khal on PATH, then ~/.local/bin/khal
+                property list<string> disabledCalendars: [] // Names from `khal printcalendars`
+                property JsonObject sync: JsonObject {
+                    property bool enable: false // Opt-in
+                    property bool onStartup: true
+                    property int intervalMinutes: 15 // 0 turns the repeating sync off
+                    property string command: "vdirsyncer sync" // Run through `bash -lc`, so PATH and uv tools work
+                }
             }
 
             // Sleep-cycle hints (the bar indicator and the desktop widget). The times

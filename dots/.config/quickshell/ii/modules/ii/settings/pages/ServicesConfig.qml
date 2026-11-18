@@ -459,5 +459,128 @@ ContentPage {
             Layout.fillWidth: true
             Layout.preferredHeight: 300
         }
+
+        ContentSection {
+            icon: "calendar_month"
+            title: Translation.tr("Calendar (Google)")
+
+            GroupedList {
+                ConfigSwitch {
+                    buttonIcon: "sync"
+                    text: Translation.tr("Keep calendars synced")
+                    checked: Config.options.calendar.sync.enable
+                    onCheckedChanged: {
+                        Config.options.calendar.sync.enable = checked;
+                    }
+                }
+                ConfigSwitch {
+                    enabled: Config.options.calendar.sync.enable
+                    buttonIcon: "login"
+                    text: Translation.tr("Sync on startup")
+                    checked: Config.options.calendar.sync.onStartup
+                    onCheckedChanged: {
+                        Config.options.calendar.sync.onStartup = checked;
+                    }
+                }
+                ConfigSpinBox {
+                    enabled: Config.options.calendar.sync.enable
+                    icon: "av_timer"
+                    text: Translation.tr("Sync interval (minutes, 0 = never)")
+                    value: Config.options.calendar.sync.intervalMinutes
+                    from: 0
+                    to: 240
+                    stepSize: 15
+                    onValueChanged: {
+                        Config.options.calendar.sync.intervalMinutes = value;
+                    }
+                }
+                ConfigTextArea {
+                    Layout.fillWidth: true
+                    buttonIcon: "terminal"
+                    text: Translation.tr("khal executable")
+                    description: CalendarService.khalAvailable
+                        ? Translation.tr("Found at %1").arg(CalendarService.khalPath)
+                        : Translation.tr("Not found at %1").arg(CalendarService.khalPath)
+                    placeholderText: Translation.tr("Empty: look it up on PATH")
+                    value: Config.options.calendar.khalPath
+                    onValueChanged: {
+                        Config.options.calendar.khalPath = value;
+                    }
+                }
+                ConfigTextArea {
+                    Layout.fillWidth: true
+                    buttonIcon: "sync"
+                    text: Translation.tr("Sync command")
+                    description: Translation.tr("Run through bash -lc")
+                    placeholderText: "vdirsyncer sync"
+                    value: Config.options.calendar.sync.command
+                    onValueChanged: {
+                        Config.options.calendar.sync.command = value;
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                RippleButtonWithIcon {
+                    materialIcon: "sync"
+                    enabled: Config.options.calendar.sync.command.trim().length > 0
+                        && !CalendarService.syncing
+                    mainText: CalendarService.syncing
+                        ? Translation.tr("Syncing…")
+                        : Translation.tr("Sync now")
+                    onClicked: CalendarService.syncNow()
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: CalendarService.lastSyncError.length > 0
+                        ? Appearance.colors.colError
+                        : Appearance.colors.colSubtext
+                    text: {
+                        if (CalendarService.syncing)
+                            return Translation.tr("Syncing…");
+                        if (!CalendarService.syncAvailable)
+                            return Translation.tr("Sync command not found. Use the full path, for example ~/.local/bin/vdirsyncer sync.");
+                        if (CalendarService.lastSyncError.length > 0)
+                            return Translation.tr("Last sync failed: %1").arg(CalendarService.lastSyncError);
+                        if (CalendarService.lastSyncTime.length > 0)
+                            return Translation.tr("Last synced at %1.").arg(CalendarService.lastSyncTime);
+                        if (!Config.options.calendar.sync.enable)
+                            return Translation.tr("Automatic sync is off. Sync now still works.");
+                        return Translation.tr("Not synced yet this session.");
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Calendars")
+                tooltip: Translation.tr("Turn a calendar off to leave its events out of the bar, dashboard widget, timetable and AI answers.")
+                visible: CalendarService.calendars.length > 0
+
+                GroupedList {
+                    ColumnLayout {
+                        spacing: 2
+
+                        Repeater {
+                            model: CalendarService.calendars
+
+                            delegate: ConfigSwitch {
+                                required property string modelData
+                                Layout.fillWidth: true
+                                buttonIcon: "calendar_month"
+                                text: modelData
+                                checked: !(Config.options.calendar.disabledCalendars || []).includes(modelData)
+                                onCheckedChanged: {
+                                    CalendarService.setCalendarEnabled(modelData, checked);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

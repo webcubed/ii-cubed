@@ -7,13 +7,35 @@ import qs
 import qs.modules.common
 import Qt.labs.platform
 import qs.modules.common.functions
-import qs.modules.common
 
 Singleton {
     id: root
 
-    readonly property string khalPath: "/home/webcubed/.local/bin/khal"
+    // --- Setup ------------------------------------------------------------
+    // Empty means "find it": the login shell's PATH first, then the uv tool
+    // location where `uv tool install khal` puts the binary.
+    readonly property string configuredKhalPath: String(Config.options.calendar.khalPath ?? "").trim()
+    property string resolvedKhalPath: ""
+    readonly property string khalPath: root.configuredKhalPath.length > 0
+        ? root.configuredKhalPath
+        : (root.resolvedKhalPath.length > 0
+            ? root.resolvedKhalPath
+            : Quickshell.env("HOME") + "/.local/bin/khal")
+
+    readonly property bool syncEnabled: Config.options.calendar.sync?.enable ?? false
+    readonly property string syncCommand: String(Config.options.calendar.sync?.command ?? "").trim()
+    readonly property int syncIntervalMinutes: Number(Config.options.calendar.sync?.intervalMinutes ?? 0)
+
+    // --- Status -----------------------------------------------------------
     property bool khalAvailable: false
+    property bool syncAvailable: true
+    property bool syncing: false
+    property string lastSyncTime: ""
+    property string lastSyncError: ""
+    property string _syncErrorOutput: ""
+    property bool _started: false
+    property var calendars: []
+
     property var events: []
     property var weekdays: [
           Translation.tr("Sunday"),
@@ -26,6 +48,81 @@ Singleton {
         ];
     property var sortedWeekdays: root.weekdays.map((_, i) => weekdays[(i+Config.options.time.firstDayOfWeek+1)%7]);
     property var eventsInWeek: root.buildEventsInWeek()
+
+    readonly property var disabledCalendars: Config.options.calendar.disabledCalendars ?? []
+
+    onKhalPathChanged: {
+        if (root._started)
+            root.checkKhal();
+    }
+
+    onDisabledCalendarsChanged: {
+        if (root.khalAvailable)
+            root.refresh();
+    }
+
+    function setCalendarEnabled(name, enabled) {
+        const current = Array.from(root.disabledCalendars);
+        const next = enabled
+            ? current.filter(n => n !== name)
+            : (current.includes(name) ? current : current.concat([name]));
+        if (next.join("\n") !== current.join("\n"))
+            Config.options.calendar.disabledCalendars = next;
+    }
+
+    function start() {
+        if (root._started)
+            return;
+        root._started = true;
+        if (root.configuredKhalPath.length === 0)
+            khalResolveProcess.running = true;
+        else
+            root.checkKhal();
+        if (root.syncEnabled && (Config.options.calendar.sync?.onStartup ?? false))
+            root.syncNow();
+    }
+
+    function checkKhal() {
+        khalCheckProcess.running = true;
+    }
+
+    // Switched-off calendars are excluded in the query itself: the school-calendar
+    // copies hold thousands of periods each, and parsing them only to drop them again
+    // is the difference between a fast refresh and a two-second one.
+    function refresh() {
+        if (!root.khalAvailable || getEventsProcess.running)
+            return;
+        const start = new Date();
+        start.setMonth(start.getMonth() - 3);
+        const end = new Date();
+        end.setMonth(end.getMonth() + 3);
+        const args = [
+            root.khalPath, "list",
+            "--json", "title", "--json", "calendar", "--json", "start-date",
+            "--json", "start-time", "--json", "end-time", "--json", "description"
+        ];
+        for (const name of root.disabledCalendars)
+            args.push("--exclude-calendar", name);
+        args.push(Qt.formatDate(start, "dd.MM.yyyy"), Qt.formatDate(end, "dd.MM.yyyy"));
+        getEventsProcess.command = args;
+        getEventsProcess.running = true;
+    }
+
+    // Calendars first, then their events: refresh needs to know which ones to ask for.
+    function loadCalendars() {
+        calendarsProcess.running = true;
+    }
+
+    // Manual sync works even when the repeating sync is off.
+    function syncNow() {
+        if (root.syncing || root.syncCommand.length === 0)
+            return;
+        root.syncAvailable = true;
+        root.syncing = true;
+        root.lastSyncError = "";
+        root._syncErrorOutput = "";
+        syncProcess.running = true;
+    }
 
     function buildEventsInWeek() {
         var result = [];
@@ -61,21 +158,7 @@ Singleton {
         return result;
     }
 
-    // Process for checking khal configuration
-    Process {
-        id: khalCheckProcess
-        command: [root.khalPath, "list", "today"]
-        running: true
-        onExited: (exitCode) => {
-          root.khalAvailable = (exitCode === 0);
-          console.log("[CalendarService] khal available:", root.khalAvailable)
-          if(root.khalAvailable){
-            getEventsProcess.running = true
-          }
-        }
-      }
-
-      function getTasksByDate(currentDate) {
+    function getTasksByDate(currentDate) {
         if(!khalAvailable){
           return []
         }
@@ -97,13 +180,125 @@ Singleton {
         }
 
         return res;
-      }
+    }
+
+    function addItem(item){
+        let title =  item['content']
+        let formattedDate = Qt.formatDate(item['date'], "dd.MM.yyyy")
+        khalAddTaskProcess.command = [root.khalPath, "new", formattedDate, title]
+        khalAddTaskProcess.running = true
+    }
+
+    function removeItem(item){
+        let taskToDelete =  item['content']
+
+        khalRemoveProcess.command = [
+          "sqlite3",
+          String(StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]).replace("file://", "") + "/.local/share/khal/khal.db",
+          "DELETE FROM events WHERE item LIKE '%SUMMARY:" + taskToDelete + "%';"
+          ]
+
+          khalRemoveProcess.running = true
+          console.log(khalRemoveProcess.command)
+    }
+
+    // Find khal when the option leaves it unset.
+    Process {
+        id: khalResolveProcess
+        command: ["bash", "-lc", "command -v khal | tail -n 1"]
+        stdout: StdioCollector {
+            id: khalResolveOutput
+            onStreamFinished: root.resolvedKhalPath = this.text.trim()
+        }
+        onExited: {
+            const detected = khalResolveOutput.text.trim();
+            if (detected.length > 0 && detected !== root.resolvedKhalPath)
+                root.resolvedKhalPath = detected;
+            root.checkKhal();
+        }
+    }
+
+    // Process for checking khal configuration
+    Process {
+        id: khalCheckProcess
+        running: false
+        command: [root.khalPath, "list", "today"]
+        onExited: (exitCode) => {
+            root.khalAvailable = (exitCode === 0);
+            console.log("[CalendarService] khal available:", root.khalAvailable, "at", root.khalPath)
+            if (root.khalAvailable)
+                root.loadCalendars()
+        }
+    }
+
+    // Calendar names, so each one can be switched off in Settings.
+    Process {
+        id: calendarsProcess
+        command: [root.khalPath, "printcalendars"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.calendars = this.text.split("\n")
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                console.log("[CalendarService] Calendars:", root.calendars.join(", "))
+            }
+        }
+        onExited: root.refresh()
+    }
+
+    // Process for pulling Google Calendar changes down to the local calendars
+    Process {
+        id: syncProcess
+        command: ["bash", "-lc", root.syncCommand]
+        stderr: StdioCollector {
+            id: syncStderr
+            onStreamFinished: root._syncErrorOutput = this.text
+        }
+        onExited: (exitCode) => {
+            root.syncing = false;
+            if (exitCode === 0) {
+                root.lastSyncTime = Qt.formatDateTime(new Date(), "HH:mm");
+                root.lastSyncError = "";
+                root.loadCalendars();
+                console.log("[CalendarService] sync finished")
+            } else {
+                root.lastSyncError = (root._syncErrorOutput.trim()
+                    || Translation.tr("Exit code %1").arg(exitCode));
+                if (exitCode === 127) // command not found: stop retrying until asked again
+                    root.syncAvailable = false;
+                console.warn("[CalendarService] sync failed:", root.lastSyncError)
+            }
+        }
+    }
+
+    Timer {
+        id: syncTimer
+        running: root.syncEnabled && root.syncAvailable && root.syncIntervalMinutes > 0
+        interval: Math.max(1, root.syncIntervalMinutes) * 60000
+        repeat: true
+        onTriggered: root.syncNow()
+    }
+
+    // A sync waiting on the network or an auth prompt must not block the timer
+    // forever; losing one run is better than never syncing again.
+    Timer {
+        id: syncWatchdog
+        running: root.syncing
+        interval: 3 * 60000
+        repeat: false
+        onTriggered: {
+            if (!root.syncing)
+                return;
+            syncProcess.running = false;
+            root.syncing = false;
+            root.lastSyncError = Translation.tr("Sync timed out.");
+        }
+    }
 
     // Process for loading events
     Process {
       id: getEventsProcess
       running: false
-        command: [root.khalPath, "list", "--json", "title", "--json", "start-date", "--json" ,"start-time", "--json" ,"end-time", "--json", "description",    Qt.formatDate((() => { let d = new Date(); d.setMonth(d.getMonth() - 3); return d; })(), "dd.MM.yyyy") ,Qt.formatDate((() => { let d = new Date(); d.setMonth(d.getMonth() + 3); return d; })(), "dd.MM.yyyy")]
         stdout: StdioCollector {
 
           onStreamFinished:{
@@ -144,6 +339,7 @@ Singleton {
 
                  events.push({
                      "content": event['title'],
+                     "calendar": event['calendar'] ?? "",
                      "startDate": startDate,
                      "endDate": endDate,
                      "color": ColorUtils.stringToColor(event['title']),
@@ -164,9 +360,7 @@ Singleton {
         running: root.khalAvailable
         interval: 30000
         repeat: true
-        onTriggered: {
-          getEventsProcess.running = true
-        }
+        onTriggered: root.refresh()
     }
 
       Process {
@@ -174,28 +368,22 @@ Singleton {
         running: false
       }
 
-      function addItem(item){
-        let title =  item['content']
-        let formattedDate = Qt.formatDate(item['date'], "dd.MM.yyyy")
-        khalAddTaskProcess.command = [root.khalPath, "new", formattedDate, title]
-        khalAddTaskProcess.running = true
-      }
-
     Process {
         id: khalRemoveProcess
         running: false
       }
 
-      function removeItem(item){
-        let taskToDelete =  item['content']
+    Component.onCompleted: {
+        // Wait for the saved config so a disabled sync is not started with defaults.
+        if (Config.ready)
+            root.start();
+    }
 
-        khalRemoveProcess.command = [
-          "sqlite3",
-          String(StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]).replace("file://", "") + "/.local/share/khal/khal.db",
-          "DELETE FROM events WHERE item LIKE '%SUMMARY:" + taskToDelete + "%';"
-          ]
-
-          khalRemoveProcess.running = true
-          console.log(khalRemoveProcess.command)
+    Connections {
+        target: Config
+        function onReadyChanged() {
+            if (Config.ready)
+                root.start();
+        }
     }
 }
