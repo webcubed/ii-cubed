@@ -275,6 +275,8 @@ Do not read `Config.options.*` before `Config.ready === true`. Guard with:
 readonly property bool myValue: Config.ready ? Config.options?.mySection?.value ?? false : false
 ```
 
+`Weather` is the worked example of getting this wrong: it used to fetch in `Component.onCompleted`, i.e. with the default provider and an empty city, and that request's failure is what popped "weather service unreachable" at login. It now waits for `Config.ready` (a `Connections` on `onReadyChanged`), its fetch scripts print `failMarkerNetwork` / `failMarkerCity` on stdout instead of signalling failure with empty output, `_handleFetchFailure()` retries three times with a growing delay before it notifies, and the refresh timer runs even with GPS on so the city fallback keeps working when no position fix ever arrives.
+
 ### 9. Import Paths
 
 Modules resolve from directory structure automatically (no `qmldir` files). Import `qs.modules.ii.bar` to access types in `modules/ii/bar/`.
@@ -682,7 +684,10 @@ The cheatsheet (`modules/ii/cheatsheet/Cheatsheet.qml`) has built-in tabs plus e
 **Built-in tabs:**
 | Tab | Icon | Component |
 |-----|------|-----------|
+| Commands | `terminal` | `commands/CheatsheetCommands.qml` — saved shell commands with their forms |
 | Timetable | `calendar_month` | `CheatsheetTimetable.qml` — weekly timetable from khal events with time slots, current time indicator, auto-scroll |
+| Periodic table | `science` | `CheatsheetPeriodicTable.qml` + `ElementTile.qml` — AP Chem reference: Pauling electronegativity, radius, first ionization energy, STP phase, oxidation states (common ones filled) and noble-gas/full electron configurations per element, from the `details` map in `periodic_table.js` |
+| Keybinds | `keyboard` | `CheatsheetKeybinds.qml` + `CheatsheetKeybindsCategory.qml` + `KeybindEditDialog.qml` + `KeybindAddNewLine.qml` — searchable, editable Hyprland keybinds (ported from the `ii-eve-cheatsheet-keybinds` extension so local fixes live in the repo; the extension's tab is deduped by identifier `keybinds`). Uses `HyprlandKeybinds`, `KeybindsEditor`, `CheatsheetSearch` and `scripts/keybinds/keybind_edit.py`, all in-repo |
 
 **Extension tabs:** Contributions via `ExtensionManager.getContributionPoint("cheatsheet")`.
 
@@ -692,9 +697,19 @@ To add a built-in tab:
 3. Add to `builtInTabs` array: `{ key: "mytab", icon: "icon_name", name: Translation.tr("Tab Name"), component: myTabComponent }`
 
 **Arrow key navigation in cheatsheet:**
-- Left/Right arrows: switch tabs
-- Ctrl+PageDown/PageUp or Ctrl+Tab/Backtab: switch tabs (alternative)
+- Left/Right arrows: switch tabs (fallback only — a page that publishes `handleKey(event)` gets them first)
+- Ctrl+Tab / Ctrl+Shift+Tab (Key_Backtab) or PageDown/PageUp: switch tabs (works everywhere, including pages that eat the arrows)
 - Esc: close cheatsheet
+- **Keys reach the page through the background.** A tab button usually owns the active focus, so a page's own `Keys.onPressed` does not fire. `cheatsheetBackground` therefore calls `page.handleKey(event)` on the current page before its own tab shortcuts, and the Periodic table implements it (arrows walk the grid via the spatial pick in `moveSelection()`, typing filters, Enter picks, Backspace edits, first Esc clears the query and returns false so the sheet can close). Pages without `handleKey` keep the old arrow behaviour.
+- Modifier checks must test bits (`event.modifiers & Qt.ControlModifier`), never compare the whole value: Ctrl+Shift+Tab carries Shift, which made the old `modifiers === Qt.ControlModifier` branch drop it.
+- Periodic table tiles are `focusPolicy: Qt.NoFocus` so a click cannot take keyboard focus.
+- Because nothing reliably holds focus, the arrows are ALSO wired as `Shortcut { sequence: "Up" … }` gated on `root.isCurrentPage` (`tabIndex` vs `Persistent.states.cheatsheet.tabIndex`). Shortcuts are matched by the window before key delivery, so they work no matter who owns focus — that is what finally made up/down work. Don't drop them in favour of the Keys handler.
+- Layers: `c` category, `e` electronegativity, `r` radius, `i` ionization energy, `b` block, `p` phase. A layer recolours tiles (`trendColor()`) and replaces the name with the value (`tileLabel()`); numeric layers render a gradient legend from min/max of the real data.
+- **Search bar.** The page owns `query`; the `ToolbarTextField` in the table header mirrors it with a `Binding { property: "text"; restoreMode: Binding.RestoreNone }` and writes back in `onTextChanged`, so typed text is always on screen and typing in the bar filters too. `/` focuses the bar — required because `c e r i b p` are layer keys, so "carbon" could never start a search otherwise. Layer keys fire only while `query` is empty **and** the bar is unfocused.
+- Escape inside the bar is its own `Shortcut { sequence: "Escape"; enabled: root.isCurrentPage && searchField.activeFocus }`, not the page's `handleKey`: window shortcuts are matched before key delivery, so the bar clears (then `root.forceActiveFocus()` hands the keyboard back) without racing the TextField's own key handling. The other Escape shortcuts in the tree are gated to the Commands tab/form, so there is no ambiguity.
+- **Element colours** live in `palette.js` (Catppuccin Macchiato), imported as `Mac`: importing it as `Palette` shadows QtQuick's own `Palette` type and qmllint reports the colours as missing on `QQuickPalette`. Only entries something reads are kept.
+- **Tile glyph contrast is measured, not guessed.** `ElementTile` paints an opaque fill — `ColorUtils.mix(accent, Appearance.colors.colLayer0, tint)` — so the colour under the glyphs is known, then picks between the accent and Macchiato `crust` by WCAG contrast ratio. At the block/phase fill (`fillStrength: 0.42`, i.e. 58% accent) the measured winner is `crust`, so gas/liquid/solid and every block get dark glyphs; numeric (0.70) and category (0.86) tiles keep the accent glyph, still ≥3.1:1. Caveat: with shell transparency enabled the wallpaper shifts the real backdrop, so `colLayer0` is an approximation there.
+- **Cheatsheet sizing**: `cheatsheetBackground.height` and `cheatsheetColumnLayout.height` are clamped to the screen, so pages with tall content get a shorter viewport. A page that can overflow must put its content in a `StyledFlickable` with `contentHeight` from the content (periodic table and keybinds both do); the periodic page also scrolls the selected row into view via `ensureSelectionVisible()`.
 
 ## Bottom Widget Group Navigation
 

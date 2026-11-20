@@ -28,20 +28,13 @@ Item {
     // Injected by Cheatsheet.qml's tab delegate. Falls back to the delegate
     // context's `index`, then to "assume current".
     property int tabIndex: -1
-    readonly property bool isCurrentTab: {
-        if (root.tabIndex >= 0) {
-            try {
-                return swipeView.currentIndex === root.tabIndex;
-            } catch (e) {
-                return true;
-            }
-        }
-        try {
-            return swipeView.currentIndex === index;
-        } catch (e) {
-            return true;
-        }
-    }
+    // `swipeView` lives in Cheatsheet.qml and is not in scope in this file, so
+    // the old "ask the SwipeView" check always failed and fell back to true.
+    // That left this page's Up/Down shortcuts enabled on every tab, which made
+    // the arrow keys ambiguous and stopped the periodic table (and this page)
+    // from seeing them at all. Compare the injected tab index with the state
+    // the SwipeView writes instead.
+    readonly property bool isCurrentTab: root.tabIndex >= 0 && root.tabIndex === Persistent.states.cheatsheet.tabIndex
     readonly property bool isTabActive: root.visible && root.isCurrentTab
 
     property bool importSuccess: false

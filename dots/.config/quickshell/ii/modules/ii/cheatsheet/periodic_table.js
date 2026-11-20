@@ -194,3 +194,156 @@ const niceTypes = {
     'lanthanum': "Lanthanum",
     'actinium': "Actinium"
 }
+
+// ---------------------------------------------------------------------------
+// Per-element reference data for the AP Chem readout.
+//
+// `en`  Pauling electronegativity (null where none is defined)
+// `ox`  oxidation states, `common` the ones worth memorising (filled pills)
+// `config` IUPAC ground-state configuration in noble-gas shorthand
+// `full`   same configuration with the core written out
+// ---------------------------------------------------------------------------
+const details = {
+    // en: Pauling electronegativity · ox/common: oxidation states · config/full:
+    // electron configuration · radius: pm · ionization: first IE, kJ/mol ·
+    // phase: state at STP
+    1: { en: 2.20, ox: [-1, 1], common: [1], config: "1s1", full: "1s1", radius: 120, ionization: 1312, phase: "gas" },
+    2: { en: null, ox: [], common: [], config: "1s2", full: "1s2", radius: 140, ionization: 2372.3, phase: "gas" },
+    3: { en: 0.98, ox: [1], common: [1], config: "[He] 2s1", full: "1s2 2s1", radius: 182, ionization: 520.2, phase: "solid" },
+    4: { en: 1.57, ox: [2], common: [2], config: "[He] 2s2", full: "1s2 2s2", radius: 153, ionization: 899.5, phase: "solid" },
+    5: { en: 2.04, ox: [3], common: [3], config: "[He] 2s2 2p1", full: "1s2 2s2 2p1", radius: 192, ionization: 800.6, phase: "solid" },
+    6: { en: 2.55, ox: [-4, -3, -2, -1, 1, 2, 3, 4], common: [-4, 4], config: "[He] 2s2 2p2", full: "1s2 2s2 2p2", radius: 170, ionization: 1086.4, phase: "solid" },
+    7: { en: 3.04, ox: [-3, -2, -1, 1, 2, 3, 4, 5], common: [-3, 3, 5], config: "[He] 2s2 2p3", full: "1s2 2s2 2p3", radius: 155, ionization: 1402.3, phase: "gas" },
+    8: { en: 3.44, ox: [-2, -1, 1, 2], common: [-2], config: "[He] 2s2 2p4", full: "1s2 2s2 2p4", radius: 152, ionization: 1313.9, phase: "gas" },
+    9: { en: 3.98, ox: [-1], common: [-1], config: "[He] 2s2 2p5", full: "1s2 2s2 2p5", radius: 135, ionization: 1681.1, phase: "gas" },
+    10: { en: null, ox: [], common: [], config: "[He] 2s2 2p6", full: "1s2 2s2 2p6", radius: 154, ionization: 2080.7, phase: "gas" },
+    11: { en: 0.93, ox: [1], common: [1], config: "[Ne] 3s1", full: "1s2 2s2 2p6 3s1", radius: 227, ionization: 495.8, phase: "solid" },
+    12: { en: 1.31, ox: [2], common: [2], config: "[Ne] 3s2", full: "1s2 2s2 2p6 3s2", radius: 173, ionization: 737.7, phase: "solid" },
+    13: { en: 1.61, ox: [3], common: [3], config: "[Ne] 3s2 3p1", full: "1s2 2s2 2p6 3s2 3p1", radius: 184, ionization: 577.6, phase: "solid" },
+    14: { en: 1.90, ox: [-4, 4], common: [-4, 4], config: "[Ne] 3s2 3p2", full: "1s2 2s2 2p6 3s2 3p2", radius: 210, ionization: 786.5, phase: "solid" },
+    15: { en: 2.19, ox: [-3, 3, 5], common: [-3, 3, 5], config: "[Ne] 3s2 3p3", full: "1s2 2s2 2p6 3s2 3p3", radius: 180, ionization: 1011.8, phase: "solid" },
+    16: { en: 2.58, ox: [-2, 2, 4, 6], common: [-2, 4, 6], config: "[Ne] 3s2 3p4", full: "1s2 2s2 2p6 3s2 3p4", radius: 180, ionization: 999.6, phase: "solid" },
+    17: { en: 3.16, ox: [-1, 1, 3, 5, 7], common: [-1, 1, 5, 7], config: "[Ne] 3s2 3p5", full: "1s2 2s2 2p6 3s2 3p5", radius: 175, ionization: 1251.2, phase: "gas" },
+    18: { en: null, ox: [], common: [], config: "[Ne] 3s2 3p6", full: "1s2 2s2 2p6 3s2 3p6", radius: 188, ionization: 1520.6, phase: "gas" },
+    19: { en: 0.82, ox: [1], common: [1], config: "[Ar] 4s1", full: "1s2 2s2 2p6 3s2 3p6 4s1", radius: 275, ionization: 418.8, phase: "solid" },
+    20: { en: 1.00, ox: [2], common: [2], config: "[Ar] 4s2", full: "1s2 2s2 2p6 3s2 3p6 4s2", radius: 231, ionization: 589.8, phase: "solid" },
+    21: { en: 1.36, ox: [3], common: [3], config: "[Ar] 3d1 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d1 4s2", radius: 211, ionization: 633, phase: "solid" },
+    22: { en: 1.54, ox: [2, 3, 4], common: [4], config: "[Ar] 3d2 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d2 4s2", radius: 187, ionization: 658.8, phase: "solid" },
+    23: { en: 1.63, ox: [2, 3, 4, 5], common: [4, 5], config: "[Ar] 3d3 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d3 4s2", radius: 179, ionization: 650.9, phase: "solid" },
+    24: { en: 1.66, ox: [2, 3, 6], common: [3, 6], config: "[Ar] 3d5 4s1", full: "1s2 2s2 2p6 3s2 3p6 3d5 4s1", radius: 189, ionization: 652.9, phase: "solid" },
+    25: { en: 1.55, ox: [2, 3, 4, 6, 7], common: [2, 4, 7], config: "[Ar] 3d5 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d5 4s2", radius: 197, ionization: 717.3, phase: "solid" },
+    26: { en: 1.83, ox: [2, 3, 6], common: [2, 3], config: "[Ar] 3d6 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d6 4s2", radius: 194, ionization: 762.4, phase: "solid" },
+    27: { en: 1.88, ox: [2, 3], common: [2, 3], config: "[Ar] 3d7 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d7 4s2", radius: 192, ionization: 760.4, phase: "solid" },
+    28: { en: 1.91, ox: [2, 3], common: [2], config: "[Ar] 3d8 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d8 4s2", radius: 163, ionization: 737.1, phase: "solid" },
+    29: { en: 1.90, ox: [1, 2], common: [1, 2], config: "[Ar] 3d10 4s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s1", radius: 140, ionization: 745.4, phase: "solid" },
+    30: { en: 1.65, ox: [2], common: [2], config: "[Ar] 3d10 4s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2", radius: 139, ionization: 906.4, phase: "solid" },
+    31: { en: 1.81, ox: [3], common: [3], config: "[Ar] 3d10 4s2 4p1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p1", radius: 187, ionization: 578.8, phase: "solid" },
+    32: { en: 2.01, ox: [2, 4], common: [4], config: "[Ar] 3d10 4s2 4p2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p2", radius: 211, ionization: 762.2, phase: "solid" },
+    33: { en: 2.18, ox: [-3, 3, 5], common: [3, 5], config: "[Ar] 3d10 4s2 4p3", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p3", radius: 185, ionization: 947, phase: "solid" },
+    34: { en: 2.55, ox: [-2, 4, 6], common: [-2, 4], config: "[Ar] 3d10 4s2 4p4", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p4", radius: 190, ionization: 940.9, phase: "solid" },
+    35: { en: 2.96, ox: [-1, 1, 3, 5, 7], common: [-1], config: "[Ar] 3d10 4s2 4p5", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p5", radius: 183, ionization: 1139.9, phase: "liquid" },
+    36: { en: 3.00, ox: [2], common: [], config: "[Ar] 3d10 4s2 4p6", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6", radius: 202, ionization: 1350.8, phase: "gas" },
+    37: { en: 0.82, ox: [1], common: [1], config: "[Kr] 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 5s1", radius: 303, ionization: 403, phase: "solid" },
+    38: { en: 0.95, ox: [2], common: [2], config: "[Kr] 5s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 5s2", radius: 249, ionization: 549.5, phase: "solid" },
+    39: { en: 1.22, ox: [3], common: [3], config: "[Kr] 4d1 5s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d1 5s2", radius: 219, ionization: 599.8, phase: "solid" },
+    40: { en: 1.33, ox: [4], common: [4], config: "[Kr] 4d2 5s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d2 5s2", radius: 186, ionization: 640.1, phase: "solid" },
+    41: { en: 1.60, ox: [3, 5], common: [5], config: "[Kr] 4d4 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d4 5s1", radius: 207, ionization: 652.1, phase: "solid" },
+    42: { en: 2.16, ox: [2, 3, 4, 5, 6], common: [6], config: "[Kr] 4d5 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d5 5s1", radius: 209, ionization: 684.3, phase: "solid" },
+    43: { en: 1.90, ox: [4, 6, 7], common: [7], config: "[Kr] 4d5 5s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d5 5s2", radius: 209, ionization: 702.4, phase: "solid" },
+    44: { en: 2.20, ox: [2, 3, 4, 6, 8], common: [3, 4], config: "[Kr] 4d7 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d7 5s1", radius: 207, ionization: 710.2, phase: "solid" },
+    45: { en: 2.28, ox: [1, 2, 3, 4], common: [3], config: "[Kr] 4d8 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d8 5s1", radius: 195, ionization: 719.7, phase: "solid" },
+    46: { en: 2.20, ox: [2, 4], common: [2], config: "[Kr] 4d10", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10", radius: 202, ionization: 804.4, phase: "solid" },
+    47: { en: 1.93, ox: [1, 2, 3], common: [1], config: "[Kr] 4d10 5s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s1", radius: 172, ionization: 731, phase: "solid" },
+    48: { en: 1.69, ox: [2], common: [2], config: "[Kr] 4d10 5s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2", radius: 158, ionization: 867.8, phase: "solid" },
+    49: { en: 1.78, ox: [1, 3], common: [3], config: "[Kr] 4d10 5s2 5p1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p1", radius: 193, ionization: 558.3, phase: "solid" },
+    50: { en: 1.96, ox: [2, 4], common: [2, 4], config: "[Kr] 4d10 5s2 5p2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p2", radius: 217, ionization: 708.6, phase: "solid" },
+    51: { en: 2.05, ox: [-3, 3, 5], common: [3, 5], config: "[Kr] 4d10 5s2 5p3", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p3", radius: 206, ionization: 833.6, phase: "solid" },
+    52: { en: 2.10, ox: [-2, 4, 6], common: [-2, 4], config: "[Kr] 4d10 5s2 5p4", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p4", radius: 206, ionization: 869.3, phase: "solid" },
+    53: { en: 2.66, ox: [-1, 1, 3, 5, 7], common: [-1, 5, 7], config: "[Kr] 4d10 5s2 5p5", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p5", radius: 198, ionization: 1008.4, phase: "solid" },
+    54: { en: 2.60, ox: [2, 4, 6, 8], common: [], config: "[Kr] 4d10 5s2 5p6", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p6", radius: 216, ionization: 1170.4, phase: "gas" },
+    55: { en: 0.79, ox: [1], common: [1], config: "[Xe] 6s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p6 6s1", radius: 343, ionization: 375.7, phase: "solid" },
+    56: { en: 0.89, ox: [2], common: [2], config: "[Xe] 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p6 6s2", radius: 268, ionization: 502.9, phase: "solid" },
+    57: { en: 1.10, ox: [3], common: [3], config: "[Xe] 5d1 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 5s2 5p6 5d1 6s2", radius: 240, ionization: 538.1, phase: "solid" },
+    58: { en: 1.12, ox: [3, 4], common: [3, 4], config: "[Xe] 4f1 5d1 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f1 5s2 5p6 5d1 6s2", radius: 235, ionization: 534.4, phase: "solid" },
+    59: { en: 1.13, ox: [3, 4], common: [3], config: "[Xe] 4f3 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f3 5s2 5p6 6s2", radius: 239, ionization: 527.2, phase: "solid" },
+    60: { en: 1.14, ox: [3], common: [3], config: "[Xe] 4f4 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f4 5s2 5p6 6s2", radius: 229, ionization: 533.1, phase: "solid" },
+    61: { en: 1.13, ox: [3], common: [3], config: "[Xe] 4f5 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f5 5s2 5p6 6s2", radius: 236, ionization: 535.5, phase: "solid" },
+    62: { en: 1.17, ox: [2, 3], common: [3], config: "[Xe] 4f6 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f6 5s2 5p6 6s2", radius: 229, ionization: 544.6, phase: "solid" },
+    63: { en: 1.20, ox: [2, 3], common: [2, 3], config: "[Xe] 4f7 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f7 5s2 5p6 6s2", radius: 233, ionization: 547.1, phase: "solid" },
+    64: { en: 1.20, ox: [3], common: [3], config: "[Xe] 4f7 5d1 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f7 5s2 5p6 5d1 6s2", radius: 237, ionization: 593.4, phase: "solid" },
+    65: { en: 1.10, ox: [3, 4], common: [3], config: "[Xe] 4f9 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f9 5s2 5p6 6s2", radius: 221, ionization: 565.8, phase: "solid" },
+    66: { en: 1.22, ox: [3], common: [3], config: "[Xe] 4f10 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f10 5s2 5p6 6s2", radius: 229, ionization: 573, phase: "solid" },
+    67: { en: 1.23, ox: [3], common: [3], config: "[Xe] 4f11 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f11 5s2 5p6 6s2", radius: 216, ionization: 581, phase: "solid" },
+    68: { en: 1.24, ox: [3], common: [3], config: "[Xe] 4f12 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f12 5s2 5p6 6s2", radius: 235, ionization: 589.3, phase: "solid" },
+    69: { en: 1.25, ox: [3], common: [3], config: "[Xe] 4f13 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f13 5s2 5p6 6s2", radius: 227, ionization: 596.7, phase: "solid" },
+    70: { en: 1.10, ox: [2, 3], common: [3], config: "[Xe] 4f14 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 6s2", radius: 242, ionization: 603.4, phase: "solid" },
+    71: { en: 1.27, ox: [3], common: [3], config: "[Xe] 4f14 5d1 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d1 6s2", radius: 221, ionization: 523.5, phase: "solid" },
+    72: { en: 1.30, ox: [4], common: [4], config: "[Xe] 4f14 5d2 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d2 6s2", radius: 212, ionization: 658.5, phase: "solid" },
+    73: { en: 1.50, ox: [5], common: [5], config: "[Xe] 4f14 5d3 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d3 6s2", radius: 217, ionization: 761.3, phase: "solid" },
+    74: { en: 2.36, ox: [2, 3, 4, 5, 6], common: [6], config: "[Xe] 4f14 5d4 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d4 6s2", radius: 210, ionization: 770, phase: "solid" },
+    75: { en: 1.90, ox: [4, 6, 7], common: [7], config: "[Xe] 4f14 5d5 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d5 6s2", radius: 217, ionization: 760.3, phase: "solid" },
+    76: { en: 2.20, ox: [2, 3, 4, 6, 8], common: [4, 8], config: "[Xe] 4f14 5d6 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d6 6s2", radius: 216, ionization: 839.4, phase: "solid" },
+    77: { en: 2.20, ox: [3, 4, 6], common: [3, 4], config: "[Xe] 4f14 5d7 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d7 6s2", radius: 202, ionization: 878, phase: "solid" },
+    78: { en: 2.28, ox: [2, 4], common: [2, 4], config: "[Xe] 4f14 5d9 6s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d9 6s1", radius: 209, ionization: 868.4, phase: "solid" },
+    79: { en: 2.54, ox: [1, 3], common: [3], config: "[Xe] 4f14 5d10 6s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s1", radius: 166, ionization: 890.2, phase: "solid" },
+    80: { en: 2.00, ox: [1, 2], common: [2], config: "[Xe] 4f14 5d10 6s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2", radius: 209, ionization: 1007.1, phase: "liquid" },
+    81: { en: 1.62, ox: [1, 3], common: [1], config: "[Xe] 4f14 5d10 6s2 6p1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p1", radius: 196, ionization: 589.3, phase: "solid" },
+    82: { en: 2.33, ox: [2, 4], common: [2], config: "[Xe] 4f14 5d10 6s2 6p2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p2", radius: 202, ionization: 715.6, phase: "solid" },
+    83: { en: 2.02, ox: [3, 5], common: [3], config: "[Xe] 4f14 5d10 6s2 6p3", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p3", radius: 207, ionization: 703.3, phase: "solid" },
+    84: { en: 2.00, ox: [-2, 2, 4, 6], common: [4], config: "[Xe] 4f14 5d10 6s2 6p4", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p4", radius: 197, ionization: 812.1, phase: "solid" },
+    85: { en: 2.20, ox: [-1, 1], common: [-1], config: "[Xe] 4f14 5d10 6s2 6p5", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p5", radius: 202, ionization: 916.6, phase: "solid" },
+    86: { en: 2.20, ox: [2], common: [], config: "[Xe] 4f14 5d10 6s2 6p6", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p6", radius: 220, ionization: 1036.7, phase: "gas" },
+    87: { en: 0.70, ox: [1], common: [1], config: "[Rn] 7s1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p6 7s1", radius: 348, ionization: 376.3, phase: "solid" },
+    88: { en: 0.90, ox: [2], common: [2], config: "[Rn] 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p6 7s2", radius: 283, ionization: 509.3, phase: "solid" },
+    89: { en: 1.10, ox: [3], common: [3], config: "[Rn] 6d1 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p6 6d1 7s2", radius: 260, ionization: 498.8, phase: "solid" },
+    90: { en: 1.30, ox: [4], common: [4], config: "[Rn] 6d2 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 6s2 6p6 6d2 7s2", radius: 237, ionization: 586.6, phase: "solid" },
+    91: { en: 1.50, ox: [4, 5], common: [5], config: "[Rn] 5f2 6d1 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f2 6s2 6p6 6d1 7s2", radius: 243, ionization: 568.3, phase: "solid" },
+    92: { en: 1.38, ox: [3, 4, 5, 6], common: [4, 6], config: "[Rn] 5f3 6d1 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f3 6s2 6p6 6d1 7s2", radius: 240, ionization: 597.6, phase: "solid" },
+    93: { en: 1.36, ox: [3, 4, 5, 6, 7], common: [5], config: "[Rn] 5f4 6d1 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f4 6s2 6p6 6d1 7s2", radius: 221, ionization: 604.6, phase: "solid" },
+    94: { en: 1.28, ox: [3, 4, 5, 6], common: [4], config: "[Rn] 5f6 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f6 6s2 6p6 7s2", radius: 243, ionization: 584.7, phase: "solid" },
+    95: { en: 1.13, ox: [3, 4, 5, 6], common: [3], config: "[Rn] 5f7 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f7 6s2 6p6 7s2", radius: 244, ionization: 578.2, phase: "solid" },
+    96: { en: 1.28, ox: [3, 4], common: [3], config: "[Rn] 5f7 6d1 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f7 6s2 6p6 6d1 7s2", radius: 245, ionization: 580.8, phase: "solid" },
+    97: { en: 1.30, ox: [3, 4], common: [3], config: "[Rn] 5f9 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f9 6s2 6p6 7s2", radius: 244, ionization: 601.1, phase: "solid" },
+    98: { en: 1.30, ox: [3], common: [3], config: "[Rn] 5f10 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f10 6s2 6p6 7s2", radius: 245, ionization: 607.9, phase: "solid" },
+    99: { en: 1.30, ox: [3], common: [3], config: "[Rn] 5f11 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f11 6s2 6p6 7s2", radius: 245, ionization: 619.4, phase: "solid" },
+    100: { en: 1.30, ox: [3], common: [3], config: "[Rn] 5f12 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f12 6s2 6p6 7s2", radius: null, ionization: 627.2, phase: "solid" },
+    101: { en: 1.30, ox: [2, 3], common: [3], config: "[Rn] 5f13 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f13 6s2 6p6 7s2", radius: null, ionization: 634.9, phase: "solid" },
+    102: { en: 1.30, ox: [2, 3], common: [2], config: "[Rn] 5f14 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 7s2", radius: null, ionization: 641.6, phase: "solid" },
+    103: { en: 1.30, ox: [3], common: [3], config: "[Rn] 5f14 7s2 7p1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 7s2 7p1", radius: null, ionization: null, phase: "solid" },
+    104: { en: null, ox: [4], common: [4], config: "[Rn] 5f14 6d2 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d2 7s2", radius: null, ionization: null, phase: "solid" },
+    105: { en: null, ox: [5], common: [5], config: "[Rn] 5f14 6d3 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d3 7s2", radius: null, ionization: null, phase: "solid" },
+    106: { en: null, ox: [6], common: [6], config: "[Rn] 5f14 6d4 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d4 7s2", radius: null, ionization: null, phase: "solid" },
+    107: { en: null, ox: [7], common: [7], config: "[Rn] 5f14 6d5 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d5 7s2", radius: null, ionization: null, phase: "solid" },
+    108: { en: null, ox: [8], common: [8], config: "[Rn] 5f14 6d6 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d6 7s2", radius: null, ionization: null, phase: "solid" },
+    109: { en: null, ox: [3], common: [3], config: "[Rn] 5f14 6d7 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d7 7s2", radius: null, ionization: null, phase: "solid" },
+    110: { en: null, ox: [4], common: [4], config: "[Rn] 5f14 6d8 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d8 7s2", radius: null, ionization: null, phase: "solid" },
+    111: { en: null, ox: [3], common: [3], config: "[Rn] 5f14 6d9 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d9 7s2", radius: null, ionization: null, phase: "solid" },
+    112: { en: null, ox: [2], common: [2], config: "[Rn] 5f14 6d10 7s2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2", radius: null, ionization: null, phase: "solid" },
+    113: { en: null, ox: [1], common: [1], config: "[Rn] 5f14 6d10 7s2 7p1", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p1", radius: null, ionization: null, phase: "solid" },
+    114: { en: null, ox: [2], common: [2], config: "[Rn] 5f14 6d10 7s2 7p2", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p2", radius: null, ionization: null, phase: "solid" },
+    115: { en: null, ox: [1], common: [1], config: "[Rn] 5f14 6d10 7s2 7p3", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p3", radius: null, ionization: null, phase: "solid" },
+    116: { en: null, ox: [2], common: [2], config: "[Rn] 5f14 6d10 7s2 7p4", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p4", radius: null, ionization: null, phase: "solid" },
+    117: { en: null, ox: [-1, 1], common: [-1], config: "[Rn] 5f14 6d10 7s2 7p5", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p5", radius: null, ionization: null, phase: "solid" },
+    118: { en: null, ox: [], common: [], config: "[Rn] 5f14 6d10 7s2 7p6", full: "1s2 2s2 2p6 3s2 3p6 3d10 4s2 4p6 4d10 4f14 5s2 5p6 5d10 5f14 6s2 6p6 6d10 7s2 7p6", radius: null, ionization: null, phase: "gas" },
+};
+
+const detailDefaults = { en: null, ox: [], common: [], config: "", full: "" };
+
+function detailFor(number) {
+    return Object.assign({}, detailDefaults, details[number] || {});
+}
+
+const SUPERSCRIPT_DIGITS = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+
+/// "… 3d6 4s2" -> "… 3d⁶ 4s²", so configurations read like they do on paper.
+function superscript(text) {
+    return String(text || "").replace(/([spdf])(\d+)/g, (match, orbital, digits) =>
+        orbital + digits.split("").map(digit => SUPERSCRIPT_DIGITS[Number(digit)]).join(""));
+}
+
+/// Oxidation state with an explicit sign and a real minus sign.
+function oxidationLabel(value) {
+    if (value === 0)
+        return "0";
+    return value > 0 ? "+" + value : "−" + Math.abs(value);
+}

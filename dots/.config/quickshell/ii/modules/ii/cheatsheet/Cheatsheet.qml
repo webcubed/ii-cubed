@@ -77,6 +77,11 @@ Scope { // Scope
     }
 
     Component {
+        id: cheatsheetKeybindsComponent
+        CheatsheetKeybinds {}
+    }
+
+    Component {
         id: cheatsheetTimetableComponent
         CheatsheetTimetable {}
     }
@@ -89,7 +94,10 @@ Scope { // Scope
     readonly property var builtInTabs: [
         { key: "commands", icon: "terminal", name: Translation.tr("Commands"), component: cheatsheetCommandsComponent },
         { key: "timetable", icon: "calendar_month", name: Translation.tr("Timetable"), component: cheatsheetTimetableComponent },
-        { key: "periodicTable", icon: "science", name: Translation.tr("Periodic table"), component: cheatsheetPeriodicTableComponent }
+        { key: "periodicTable", icon: "science", name: Translation.tr("Periodic table"), component: cheatsheetPeriodicTableComponent },
+        // Built in, so the ii-eve-cheatsheet-keybinds extension is deduped by
+        // identifier and stops overriding it with an unpatched copy.
+        { key: "keybinds", icon: "keyboard", name: Translation.tr("Keybinds"), component: cheatsheetKeybindsComponent }
     ]
 
     // Built-in tabs first, then extension pages. An installed extension can
@@ -215,10 +223,43 @@ Scope { // Scope
                 property real padding: 20
                 implicitWidth: cheatsheetColumnLayout.implicitWidth + padding * 2
                 implicitHeight: cheatsheetColumnLayout.implicitHeight + padding * 2
+                // Never taller than the screen. Pages that need more scroll
+                // inside their own Flickable instead of running off the edge.
+                height: Math.min(implicitHeight, cheatsheetRoot.height - Appearance.sizes.elevationMargin * 2)
+                width: implicitWidth
 
                 Keys.onPressed: event => {
+                    // The current page gets first refusal. Pages like the
+                    // periodic table walk their own grid with the arrows and
+                    // search on typed text; a tab button usually owns the
+                    // active focus, so their own Keys handler never fires and
+                    // the event lands here instead.
+                    const pageLoader = swipeView.itemAt(swipeView.currentIndex);
+                    const page = pageLoader && pageLoader.item ? pageLoader.item : null;
+                    if (page && typeof page.handleKey === "function" && page.handleKey(event)) {
+                        event.accepted = true;
+                        return;
+                    }
+
+                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                    const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
                     if (event.key === Qt.Key_Escape) {
                         cheatsheetRoot.hide();
+                        event.accepted = true;
+                    } else if (ctrl && (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)) {
+                        // Ctrl+Shift+Tab arrives as Key_Backtab, and it carries
+                        // the Shift modifier, so test the bits instead of
+                        // comparing the whole modifier value.
+                        if (shift || event.key === Qt.Key_Backtab)
+                            tabBar.decrementCurrentIndex();
+                        else
+                            tabBar.incrementCurrentIndex();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_PageDown) {
+                        tabBar.incrementCurrentIndex();
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_PageUp) {
+                        tabBar.decrementCurrentIndex();
                         event.accepted = true;
                     } else if (event.key === Qt.Key_Left) {
                         tabBar.decrementCurrentIndex();
@@ -226,20 +267,6 @@ Scope { // Scope
                     } else if (event.key === Qt.Key_Right) {
                         tabBar.incrementCurrentIndex();
                         event.accepted = true;
-                    } else if (event.modifiers === Qt.ControlModifier) {
-                        if (event.key === Qt.Key_PageDown) {
-                            tabBar.incrementCurrentIndex();
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_PageUp) {
-                            tabBar.decrementCurrentIndex();
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Tab) {
-                            tabBar.setCurrentIndex((tabBar.currentIndex + 1) % root.tabButtonList.length);
-                            event.accepted = true;
-                        } else if (event.key === Qt.Key_Backtab) {
-                            tabBar.setCurrentIndex((tabBar.currentIndex - 1 + root.tabButtonList.length) % root.tabButtonList.length);
-                            event.accepted = true;
-                        }
                     }
                 }
 
@@ -272,6 +299,9 @@ Scope { // Scope
                     id: cheatsheetColumnLayout
                     anchors.centerIn: parent
                     spacing: 10
+                    // Capped so the SwipeView hands pages a viewport they can
+                    // scroll when the content is taller than the screen.
+                    height: Math.min(implicitHeight, cheatsheetBackground.height - cheatsheetBackground.padding * 2)
 
                     Toolbar {
                         Layout.alignment: Qt.AlignHCenter
@@ -295,7 +325,10 @@ Scope { // Scope
                         currentIndex: Persistent.states.cheatsheet.tabIndex
                         onCurrentIndexChanged: {
                             Persistent.states.cheatsheet.tabIndex = currentIndex;
-                            if (cheatsheetRoot._focusReady) cheatsheetRoot.focusCurrentTab();
+                            // Deferred: the tab button that triggered the change
+                            // takes focus during its own click handling.
+                            if (cheatsheetRoot._focusReady)
+                                Qt.callLater(cheatsheetRoot.focusCurrentTab);
                         }
 
                         Connections {
