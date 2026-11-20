@@ -126,21 +126,36 @@ Singleton {
         }
     }
 
-    // The fetch scripts print this marker on stdout when they fail, so failure is
-    // something they state rather than something an empty stdout implies. An empty
-    // stdout cannot mean "outage": a request that a newer one cancels (the startup
-    // pair of a config-load fetch and the first GPS fix, a provider switch, a manual
-    // refresh) is killed before it can print anything, and that empty result lands
-    // after the newer request has already started — which is why every shell start
-    // and refresh popped "weather service unreachable" while the next fetch was
-    // succeeding.
-    readonly property string fetchFailureMarker: "__weather_fetch_failed__"
+    // The fetch scripts print one of these markers on stdout when they fail, so
+    // failure is something they state rather than something an empty stdout
+    // implies. An empty stdout cannot mean "outage": a request that a newer one
+    // cancels (the startup pair of a config-load fetch and the first GPS fix, a
+    // provider switch, a manual refresh) is killed before it can print anything,
+    // and that empty result lands after the newer request has already started.
+    // Two markers, because "no such city" and "no network yet" are different
+    // problems: the single old message claimed both at once and was wrong about
+    // one of them every time.
+    readonly property string failMarkerNetwork: "__weather_fail_network__"
+    readonly property string failMarkerCity: "__weather_fail_city__"
 
     // Timestamp of the last failure notification, so one outage stays one
     // notification: a shell start alone issues several requests within seconds
     // (config load, provider change, first GPS fix), and the retry cadence is
     // minutes, not seconds.
     property double _lastFailureNotification: 0
+
+    // This service fetches right after login, when the network often is not up
+    // yet, so a single failed request says nothing about the connection. Retry a
+    // few times with a growing delay and only talk to the user once the whole
+    // streak fails.
+    readonly property int maxFetchRetries: 3
+    property int _fetchRetries: 0
+
+    Timer {
+        id: retryTimer
+        repeat: false
+        onTriggered: root.getData()
+    }
 
     function _reportFetchFailure(message) {
         const now = Date.now();
@@ -150,6 +165,29 @@ Singleton {
             Translation.tr("Weather Service"),
             message,
             "-a", "Shell"]);
+    }
+
+    // Shared by both fetch handlers. A transient failure retries in the
+    // background; only the last attempt of a streak notifies, and
+    // _reportFetchFailure throttles one outage to one message.
+    function _handleFetchFailure(message) {
+        root.forecastLoading = false;
+        console.info(`[WeatherService] fetch failed (attempt ${root._fetchRetries + 1}): ${message}`);
+        if (root._fetchRetries < root.maxFetchRetries) {
+            root._fetchRetries += 1;
+            retryTimer.interval = 4000 * root._fetchRetries;
+            retryTimer.restart();
+            return;
+        }
+        root._fetchRetries = 0;
+        root._reportFetchFailure(message);
+    }
+
+    function _failureMessage(marker) {
+        if (marker === root.failMarkerCity) {
+            return Translation.tr("No city named %1 found. Set one in Settings → Services → Weather.").arg(root.city.trim());
+        }
+        return Translation.tr("Weather service unreachable. Check your connection.");
     }
 
     function getData() {
@@ -193,17 +231,21 @@ Singleton {
             'TARGET="$1"; UA="$2"; MARK="$3"; ' +
             'ENC=$(printf %s "$TARGET" | jq -sRr @uri); ' +
             'curl -fsS --max-time 15 -H "User-Agent: $UA" "wttr.in/${ENC}?format=j1" | jq ' + "'" + jqFilter + "'" + ' || printf %s "$MARK"';
-        fetcher.command = ["bash", "-c", script, "wttr-fetch", target, ua, root.fetchFailureMarker];
+        fetcher.command = ["bash", "-c", script, "wttr-fetch", target, ua, root.failMarkerNetwork];
         fetcher.running = true;
     }
 
     function _fetchOpenMeteo() {
         const useGps = root.gpsActive && root.location.valid;
         if (!useGps && root.city.trim().length === 0) {
-            // Geocoding with an empty name returns nothing; bail out loudly so
-            // the spinner doesn't just stop with no UI feedback.
+            // Geocoding with an empty name returns nothing.
             root.forecastLoading = false;
-            root._reportFetchFailure(Translation.tr("Set a city in Settings → Services → Weather, or enable GPS."));
+            // With GPS on there is simply no fix yet, which is not an error and
+            // not something to notify about; without GPS the user has nothing
+            // configured and should hear it.
+            if (!root.gpsActive) {
+                root._reportFetchFailure(Translation.tr("Set a city in Settings → Services → Weather, or enable GPS."));
+            }
             return;
         }
 
@@ -225,20 +267,20 @@ Singleton {
                 'GEO=$(jq -nc --arg lat "$LAT" --arg lon "$LON" \'{latitude: ($lat|tonumber), longitude: ($lon|tonumber), name: ""}\') || { printf %s "$MARK"; exit 0; }; ' +
                 'FC=$(curl -fsS --max-time 15 "https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&' + forecastParams + '") || { printf %s "$MARK"; exit 0; }; ' +
                 'printf %s "$FC" | jq --argjson geo "$GEO" \'. + {geo: $geo}\' || printf %s "$MARK"';
-            argv = ["bash", "-c", script, "om-fetch", String(lat), String(lon), root.fetchFailureMarker];
+            argv = ["bash", "-c", script, "om-fetch", String(lat), String(lon), root.failMarkerNetwork];
         } else {
             script =
                 'set -o pipefail; ' +
-                'CITY="$1"; MARK="$2"; ' +
-                'ENC=$(printf %s "$CITY" | jq -sRr @uri); ' +
-                'GEO_RAW=$(curl -fsS --max-time 15 "https://geocoding-api.open-meteo.com/v1/search?name=${ENC}&count=1&language=en&format=json") || { printf %s "$MARK"; exit 0; }; ' +
-                'GEO=$(printf %s "$GEO_RAW" | jq -c \'if (.results // [] | length) == 0 then null else {latitude: .results[0].latitude, longitude: .results[0].longitude, name: .results[0].name} end\'); ' +
-                'if [ "$GEO" = "null" ] || [ -z "$GEO" ]; then printf %s "$MARK"; exit 0; fi; ' +
+                'CITY="$1"; NET="$2"; NOTFOUND="$3"; ' +
+                'ENC=$(printf %s "$CITY" | jq -sRr @uri) || { printf %s "$NET"; exit 0; }; ' +
+                'GEO_RAW=$(curl -fsS --max-time 15 "https://geocoding-api.open-meteo.com/v1/search?name=${ENC}&count=1&language=en&format=json") || { printf %s "$NET"; exit 0; }; ' +
+                'GEO=$(printf %s "$GEO_RAW" | jq -c \'if (.results // [] | length) == 0 then null else {latitude: .results[0].latitude, longitude: .results[0].longitude, name: .results[0].name} end\') || { printf %s "$NET"; exit 0; }; ' +
+                'if [ "$GEO" = "null" ] || [ -z "$GEO" ]; then printf %s "$NOTFOUND"; exit 0; fi; ' +
                 'LAT=$(printf %s "$GEO" | jq -r \'.latitude\'); ' +
                 'LON=$(printf %s "$GEO" | jq -r \'.longitude\'); ' +
-                'FC=$(curl -fsS --max-time 15 "https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&' + forecastParams + '") || { printf %s "$MARK"; exit 0; }; ' +
-                'printf %s "$FC" | jq --argjson geo "$GEO" \'. + {geo: $geo}\' || printf %s "$MARK"';
-            argv = ["bash", "-c", script, "om-fetch", root.city.trim(), root.fetchFailureMarker];
+                'FC=$(curl -fsS --max-time 15 "https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&' + forecastParams + '") || { printf %s "$NET"; exit 0; }; ' +
+                'printf %s "$FC" | jq --argjson geo "$GEO" \'. + {geo: $geo}\' || printf %s "$NET"';
+            argv = ["bash", "-c", script, "om-fetch", root.city.trim(), root.failMarkerNetwork, root.failMarkerCity];
         }
 
         openMeteoFetcher.command = argv;
@@ -389,9 +431,36 @@ Singleton {
     }
 
     Component.onCompleted: {
+        // Config loads asynchronously, so fetching here would use the default
+        // provider with an empty city: that is a request for the weather of no
+        // place in particular, and its failure at login is what used to pop
+        // "weather service unreachable" before the real config was even read.
+        if (Config.ready) startupFetchTimer.start();
         if (!root.gpsActive) return;
         console.info("[WeatherService] Starting the GPS service.");
         positionSource.start();
+    }
+
+    Connections {
+        target: Config
+        function onReadyChanged() {
+            if (Config.ready) startupFetchTimer.start();
+        }
+    }
+
+    // Belt and braces for the case where the saved config happens to equal the
+    // defaults: then no city/provider change fires, and without this the service
+    // would wait for a GPS fix, or the ten minute timer, to fetch anything.
+    Timer {
+        id: startupFetchTimer
+        interval: 2000
+        repeat: false
+        onTriggered: {
+            // A position fix or the config-change fetch already delivered.
+            if (root.gpsActive && root.location.valid) return;
+            if (root.data.lastRefresh.length > 0) return;
+            root.getData();
+        }
     }
 
     Process {
@@ -404,13 +473,14 @@ Singleton {
                     // which kills it before it can print anything. Not a failure.
                     return;
                 }
-                if (text.trim() === root.fetchFailureMarker) {
-                    root.forecastLoading = false;
-                    root._reportFetchFailure(Translation.tr("Failed to fetch weather data."));
+                const status = text.trim();
+                if (status === root.failMarkerNetwork || status === root.failMarkerCity) {
+                    root._handleFetchFailure(root._failureMessage(status));
                     return;
                 }
                 try {
                     const parsedData = JSON.parse(text);
+                    root._fetchRetries = 0;
                     root._lastRawWttr = parsedData;
                     root._lastRawOpenMeteo = null;
                     root.refineData(parsedData);
@@ -438,13 +508,14 @@ Singleton {
                     // which kills it before it can print anything. Not a failure.
                     return;
                 }
-                if (text.trim() === root.fetchFailureMarker) {
-                    root.forecastLoading = false;
-                    root._reportFetchFailure(Translation.tr("City not found or weather service unreachable."));
+                const status = text.trim();
+                if (status === root.failMarkerNetwork || status === root.failMarkerCity) {
+                    root._handleFetchFailure(root._failureMessage(status));
                     return;
                 }
                 try {
                     const parsed = JSON.parse(text);
+                    root._fetchRetries = 0;
                     root._lastRawOpenMeteo = parsed;
                     root._lastRawWttr = null;
                     root._refineOpenMeteo(parsed);
@@ -496,10 +567,11 @@ Singleton {
     }
 
     Timer {
-        running: !root.gpsActive
+        // Refresh on the configured interval even with GPS on: a fix may never
+        // arrive, and the city fallback needs to stay fresh either way.
+        running: true
         repeat: true
         interval: root.fetchInterval
-        triggeredOnStart: !root.gpsActive
         onTriggered: root.getData()
     }
 }
